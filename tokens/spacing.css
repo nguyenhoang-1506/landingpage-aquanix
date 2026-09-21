@@ -1,0 +1,30 @@
+/* Aquanix spacing, radius, shadow, motion */
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 80px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+  --radius-pill: 999px;
+  --shadow-card: 0 1px 2px rgba(11,42,51,0.06), 0 6px 16px rgba(11,42,51,0.07);
+  --shadow-pop: 0 12px 32px rgba(11,42,51,0.16);
+  --tap-min: 48px;
+  --border-w: 1px;
+  --border-w-input: 1.5px;
+  --scan-stroke: 3px;
+  --scan-arm: 38px;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1); /* @kind other */
+  --dur-fast: 120ms; /* @kind other */
+  --dur-base: 200ms; /* @kind other */
+}
+:root[data-theme="dark"] {
+  --shadow-card: 0 1px 2px rgba(0,0,0,0.5), 0 6px 16px rgba(0,0,0,0.45);
+  --shadow-pop: 0 12px 32px rgba(0,0,0,0.6);
+}

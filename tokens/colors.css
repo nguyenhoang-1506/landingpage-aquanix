@@ -1,0 +1,67 @@
+/* Aquanix color tokens — from Aquanix Design System/tokens.css */
+:root {
+  color-scheme: light;
+  --brand-700: #05505F;
+  --brand-600: #046E85;
+  --brand-500: #0198B3;
+  --brand-100: #D3EDF3;
+  --brand-50: #F1F9FB;
+  --accent-600: #C6530D;
+  --accent-500: #FE731E;
+  --accent-100: #FFE7D6;
+  --ink: #0B2A33;
+  --ink-muted: #476874;
+  --ink-subtle: #5E7D88;
+  --ink-invert: #FFFFFF;
+  --surface: #FFFFFF;
+  --surface-sunken: #F2F8FA;
+  --surface-raised: #FFFFFF;
+  --border: #D3E3E9;
+  --border-strong: #9FBCC6;
+  --success: #0F7A4A;
+  --success-bg: #E2F5EC;
+  --warning: #8F5B06;
+  --warning-bg: #FDF0D9;
+  --danger: #B3241A;
+  --danger-bg: #FDE8E5;
+  --overlay: #0b2a3366;
+  /* semantic aliases */
+  --text-body: var(--ink);
+  --text-muted: var(--ink-muted);
+  --text-on-brand: var(--ink-invert);
+  --text-on-accent: var(--ink);
+  --surface-page: var(--surface);
+  --surface-card: var(--surface-raised);
+  --action-primary: var(--brand-600);
+  --action-primary-hover: var(--brand-700);
+  --action-accent: var(--accent-500);
+  --focus-ring: var(--brand-600);
+  --focus-halo: var(--brand-100);
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --brand-700: #7FD7E6;
+  --brand-600: #4EC6DB;
+  --brand-500: #2AB6D1;
+  --brand-100: #123C49;
+  --brand-50: #0E2E38;
+  --accent-600: #FF9A57;
+  --accent-500: #FF8A3D;
+  --accent-100: #40220F;
+  --ink: #E9F4F7;
+  --ink-muted: #A6C0C9;
+  --ink-subtle: #8DA8B2;
+  --ink-invert: #06202A;
+  --surface: #0C242D;
+  --surface-sunken: #081C24;
+  --surface-raised: #133642;
+  --border: #1E4350;
+  --border-strong: #2E5C6B;
+  --success: #3FC98A;
+  --success-bg: #0C3326;
+  --warning: #F0B44B;
+  --warning-bg: #3A2A07;
+  --danger: #F4796B;
+  --danger-bg: #3C1512;
+  --overlay: #00000099;
+}

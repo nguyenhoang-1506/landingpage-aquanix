@@ -1,0 +1,93 @@
+<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Aquanix — Ghi nhật ký ao bằng điện thoại</title>
+<link rel="preload" as="image" href="./assets/photos/opt/aerial-dawn.jpg" fetchpriority="high"><link rel="stylesheet" href="./styles.css">
+<style>
+body{background:var(--surface)}h1,h2,h3{color:var(--ink)}
+.wrap{max-width:1120px;margin:0 auto;padding:0 var(--space-5);box-sizing:border-box}
+.sec{padding-top:var(--space-8);padding-bottom:var(--space-8)}
+.g2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.g3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+.feat.rev>*:first-child{order:2}
+.hero-h1{font-size:60px;line-height:66px}
+.shot{opacity:0;transition:opacity 1.6s ease;transform:scale(1.18);transform-origin:50% 60%}.shot.on{opacity:1;animation:kb 7s ease-out forwards}
+@keyframes kb{from{transform:scale(1.18) translateY(-3%)}to{transform:scale(1) translateY(0)}}
+@media(prefers-reduced-motion:reduce){.shot.on{animation:none}}
+@media(max-width:1000px){.nav{display:none!important}.dot-label{display:none}}
+html{scroll-behavior:smooth}
+@media(max-width:760px){.g2,.g3{grid-template-columns:1fr}.feat.rev>*:first-child{order:0}.sec{padding-top:var(--space-7);padding-bottom:var(--space-7)}.hero-h1{font-size:36px;line-height:42px}.dots{display:none!important}}
+@media (max-width: 860px){.hero-grid{grid-template-columns:minmax(0,1fr) !important}}
+
+@media(max-width:760px){
+  .wrap{padding-left:var(--space-4);padding-right:var(--space-4)}
+  .t-display-l{font-size:30px!important;line-height:36px!important}
+  .t-display-m{font-size:22px!important;line-height:28px!important}
+  .t-body-lg{font-size:16px!important;line-height:24px!important}
+  .day-h3{font-size:24px!important;line-height:30px!important}
+  .quote{font-size:21px!important;line-height:30px!important}
+  .hero-sec{min-height:auto!important;align-items:flex-start!important}
+  .hero-sec .wrap{padding-top:var(--space-7)!important;padding-bottom:var(--space-7)!important}
+  .hero-h1{font-size:34px;line-height:40px}
+  .hero-h1 span{text-decoration-thickness:4px!important;text-underline-offset:6px!important}
+  .hero-ctas{flex-direction:column;align-items:stretch}
+  .hero-ctas>*{width:100%;justify-content:center}
+  .hdr-brand-text{font-size:18px}
+  .feat{gap:var(--space-5)!important}
+  .pp{grid-template-columns:minmax(0,1fr) minmax(0,38%)!important}
+  .pp .pp-photo{height:300px!important}
+  .pp .pp-phone{margin-left:-14%!important}
+  .solo-photo{height:300px!important}
+  .dl-grid{grid-template-columns:minmax(0,1fr)!important}
+  .dl-grid .dl-phone{display:none!important}
+  .dl-qrs{flex-direction:row!important;justify-content:center;gap:var(--space-4)!important}
+  .form-2{grid-template-columns:1fr!important}
+  input,textarea{font-size:16px!important}
+}
+@media(max-width:400px){.hero-h1{font-size:30px;line-height:36px}.pp{grid-template-columns:minmax(0,1fr) minmax(0,42%)!important}}
+
+html,body{overflow-x:clip;max-width:100%}
+img{max-width:100%}
+@media(max-width:1000px){.menu-btn{display:inline-flex!important}}
+@media(min-width:761px) and (max-width:1000px){.hero-h1{font-size:46px;line-height:52px}.g3{grid-template-columns:repeat(2,minmax(0,1fr))}.pp .pp-photo{height:380px!important}.solo-photo{height:380px!important}}
+@media(max-width:760px){
+  .hdr{height:64px!important}
+  .steps{gap:var(--space-7)!important}
+  .step{display:block;position:relative;padding-left:44px}
+  .step-rail{position:absolute;left:0;top:0;bottom:calc(-1*var(--space-7));width:28px;display:flex;justify-content:center}
+  .step-rail::before{top:28px;bottom:0}
+  .step.last .step-rail{bottom:0}.step.last .step-rail::before{display:none}
+  .step-no{position:absolute;top:0;left:0}
+  .step-text{padding:0!important;text-align:left!important}
+  .step-media{margin-top:var(--space-5)}
+  .step .t-code{font-size:14px}
+}
+
+.one-line{white-space:nowrap}
+.step{display:grid;grid-template-columns:minmax(0,1fr) 72px minmax(0,1fr);align-items:center}
+.step-text{padding-right:var(--space-5)}
+.step.rev .step-text{order:3;padding-right:0;padding-left:var(--space-5)}
+.step.rev .step-media{order:1}.step.rev .step-rail{order:2}
+.step-rail{position:relative;align-self:stretch;display:flex;align-items:center;justify-content:center}
+.step-rail::before{content:'';position:absolute;left:50%;margin-left:-1px;width:2px;top:calc(-1*var(--space-8));bottom:calc(-1*var(--space-8));background:var(--brand-100)}
+.step.first .step-rail::before{top:50%}.step.last .step-rail::before{bottom:50%}
+.step-no{position:relative;z-index:1;display:inline-flex;width:32px;height:32px;border-radius:50%;background:var(--brand-600);color:#fff;font-weight:700;font-size:15px;align-items:center;justify-content:center;font-family:var(--font-sans);box-shadow:0 0 0 6px var(--surface)}
+@media(max-width:760px){.one-line{white-space:normal}}
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="./_ds_bundle.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+</head><body><template id="__bundler_thumbnail"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><rect width="200" height="200" fill="#0198B3"/><text x="100" y="118" text-anchor="middle" font-family="Be Vietnam Pro, sans-serif" font-weight="700" font-size="44" fill="#fff">Aquanix</text></svg></template><div id="root"></div>
+<script type="text/babel" src="./header.jsx"></script>
+<script type="text/babel" src="./hero.jsx"></script>
+<script type="text/babel" src="./sections.jsx"></script>
+<script type="text/babel">
+function App(){
+  const [sent, setSent] = React.useState(false);
+  const goTo = id => () => { const el = document.getElementById(id); if (el) window.scrollTo({ top: el.offsetTop - 72, behavior: 'smooth' }); };
+  return <>
+    <Header onCta={goTo('download')}/>
+    <main data-screen-label="Landing hộ nuôi"><Hero onCta={goTo('download')} onDay={goTo('day')}/><Day/><Sell/><Why/><Voice/><Faq/><Download sent={sent} onSend={() => setSent(true)}/></main>
+    <Footer/>
+  </>;
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script></body></html>
