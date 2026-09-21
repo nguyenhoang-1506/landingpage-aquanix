@@ -83,11 +83,11 @@ function Faq() {
   </div></section>;
 }
 // QR codes for the store links — replace LINKS with the real store URLs
-const LINKS = { ios: 'https://apps.apple.com/vn/app/aquanix', android: 'https://play.google.com/store/apps/details?id=vn.aquanix' };
+const LINKS = { ios: 'https://apps.apple.com/vn/app/aquanix/id6790356932', android: 'https://aquanix.co/' };
 function Qr({ text, label, sub }) {
   const ref = React.useRef();
   React.useEffect(() => { if (window.QRCode && ref.current) { ref.current.innerHTML = ''; new QRCode(ref.current, { text, width: 132, height: 132, colorDark: '#0B2A33', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M }); } }, [text]);
-  return <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-2)', textAlign: 'center' }}><div ref={ref} style={{ width: 120, height: 120, flex: 'none', background: '#fff', padding: 6, borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', boxSizing: 'content-box' }}></div><div><div className="t-body-strong">{label}</div><div className="t-caption" style={{ color: 'var(--ink-muted)' }}>{sub}</div></div></div>;
+  return <a href={text} target="_blank" rel="noopener" aria-label={'Tải Aquanix trên ' + sub} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-2)', textAlign: 'center', textDecoration: 'none', color: 'var(--ink)' }}><div ref={ref} style={{ width: 120, height: 120, flex: 'none', background: '#fff', padding: 6, borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', boxSizing: 'content-box' }}></div><div><div className="t-body-strong" style={{ color: 'var(--brand-600)', textDecoration: 'underline', textUnderlineOffset: 3 }}>{label}</div><div className="t-caption" style={{ color: 'var(--ink-muted)' }}>{sub}</div></div></a>;
 }
 function Download({ sent, onSend }) {
   return <section id="download"><div className="wrap sec">
@@ -109,8 +109,8 @@ function Download({ sent, onSend }) {
         <div><h3 className="t-display-m" style={{ margin: '0 0 var(--space-1)' }}>Để Aquanix cài giúp</h3><p className="t-body" style={{ margin: 0, color: 'var(--ink-muted)' }}>Điền thông tin, Aquanix gọi lại trong ngày và hẹn đến ao.</p></div>
         {sent ? <div style={{ padding: 'var(--space-4) 0' }}><StatusBadge status="ok">Đã nhận thông tin · Aquanix gọi lại trong hôm nay</StatusBadge></div> : <>
           <FieldInput label="Họ và tên hộ nuôi" required />
-          <div className="g2 form-2" style={{ gap: 'var(--space-4)' }}><FieldInput label="Số điện thoại" inputMode="tel" required /><FieldInput label="Địa chỉ" hint="Xã, huyện, tỉnh hoặc tên vùng nuôi" /></div>
-          <label style={{ display: 'block' }}><span style={{ display: 'block', fontSize: 12, fontWeight: 600, letterSpacing: '.08em', color: 'var(--ink-muted)', textTransform: 'uppercase', marginBottom: 8, lineHeight: '16px' }}>Nhu cầu / ghi chú</span><textarea rows={2} style={{ width: '100%', boxSizing: 'border-box', border: '1.5px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '12px 14px', fontFamily: 'var(--font-sans)', fontSize: 15, color: 'var(--ink)', background: 'var(--surface)', resize: 'vertical' }}></textarea><span style={{ display: 'block', fontSize: 13, lineHeight: '20px', color: 'var(--ink-muted)', marginTop: 8 }}>Ví dụ: nhà có 3 ao, muốn được cài giúp tại ao.</span></label>
+          <div className="g2 form-2" style={{ gap: 'var(--space-4)' }}><FieldInput label="Số điện thoại" inputMode="tel" required /><FieldInput label="Địa chỉ" placeholder="Xã, huyện, tỉnh hoặc tên vùng nuôi" /></div>
+          <label style={{ display: 'block' }}><span style={{ display: 'block', fontSize: 12, fontWeight: 600, letterSpacing: '.08em', color: 'var(--ink-muted)', textTransform: 'uppercase', marginBottom: 8, lineHeight: '16px' }}>Nhu cầu / ghi chú</span><textarea rows={2} placeholder="Ví dụ: nhà có 3 ao, muốn được cài giúp tại ao." style={{ width: '100%', boxSizing: 'border-box', border: '1.5px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '12px 14px', fontFamily: 'var(--font-sans)', fontSize: 15, color: 'var(--ink)', background: 'var(--surface)', resize: 'vertical' }}></textarea></label>
           <Button type="submit" variant="accent" fullWidth>Gọi lại cho tôi</Button>
         </>}
       </form>

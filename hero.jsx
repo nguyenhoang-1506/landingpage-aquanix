@@ -37,7 +37,7 @@ function Hero({ onCta, onDay }) {
   return <section id="top" className="hero-sec" style={{ position: 'relative', minHeight: 'calc(100vh - 72px)', display: 'flex', alignItems: 'flex-end', color: '#fff' }}>
     <FlycamHero />
     <div className="wrap" style={{ position: 'relative', width: '100%', paddingTop: 'var(--space-8)', paddingBottom: 'var(--space-8)' }}>
-      <StatusBadge status="ok">Giải pháp hiệu quả cho hộ nuôi</StatusBadge>
+      <StatusBadge status="ok">Nhật ký thủy sản điện tử</StatusBadge>
       <h1 className="hero-h1" style={{ margin: 'var(--space-4) 0', color: '#fff', fontWeight: 700, letterSpacing: '-0.02em', maxWidth: 820 }}>Nuôi cá có nhật ký, <span style={{ textDecoration: 'underline', textDecorationColor: 'var(--accent-500)', textDecorationThickness: 6, textUnderlineOffset: 10, textDecorationSkipInk: 'none' }}>bán cá có niềm tin</span>.</h1>
       <p className="t-body-lg" style={{ margin: '0 0 var(--space-6)', color: 'rgba(255,255,255,.88)', maxWidth: 560 }}>Aquanix ghi lại từng ngày ở ao để con cá của bạn đi xa hơn: vào nhà máy, ra siêu thị, đến bàn ăn — và ai cũng biết cá đến từ ao nào.</p>
       <div className="hero-ctas" style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
