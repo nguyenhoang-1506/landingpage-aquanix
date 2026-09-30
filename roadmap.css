@@ -129,8 +129,22 @@
 .rm-col[data-status="done"]{background:#EEF7F2}
 .rm-col[data-status="failed"]{background:#EFF1F2}
 .rm-col[data-status].over{background:var(--brand-50)}
-.rm-col[data-status="done"] .rm-card{border-color:#CFE6DA}
-.rm-col[data-status="failed"] .rm-card{border-color:#D9DEE0;opacity:.92}
+
+/* Thẻ ticket theo trạng thái: Done nền xanh + vạch xanh bên trái, Failed nền xám + chữ nhạt */
+.rm-card[data-status="done"],.rm-mcard[data-status="done"]{background:#E6F4EC;border-color:#BFE0CE;box-shadow:inset 4px 0 0 #5FB58C,var(--shadow-card)}
+.rm-card[data-status="failed"],.rm-mcard[data-status="failed"]{background:#E9EDEF;border-color:#D3DADD;box-shadow:inset 4px 0 0 #98A3A8,var(--shadow-card)}
+.rm-card[data-status="done"]:hover,.rm-mcard[data-status="done"]:hover{border-color:#5FB58C}
+.rm-card[data-status="failed"]:hover,.rm-mcard[data-status="failed"]:hover{border-color:#98A3A8}
+.rm-card[data-status="done"] .rm-code,.rm-mcard[data-status="done"] .rm-code{color:#2E7D5B}
+.rm-card[data-status="failed"] .rm-code,.rm-mcard[data-status="failed"] .rm-code,
+.rm-card[data-status="failed"] .rm-clamp,.rm-mcard[data-status="failed"] .rm-clamp{color:#5B6B72}
+.rm-card[data-status="done"] .rm-card-b,.rm-card[data-status="failed"] .rm-card-b{padding-left:16px}
+.rm-table tbody tr[data-status="done"]{background:#F2FAF5}
+.rm-table tbody tr[data-status="failed"]{background:#F3F5F6}
+.rm-table tbody tr[data-status="done"] td:first-child{box-shadow:inset 4px 0 0 #5FB58C}
+.rm-table tbody tr[data-status="failed"] td:first-child{box-shadow:inset 4px 0 0 #98A3A8}
+.rm-table tbody tr[data-status="failed"] .rm-clamp{color:#5B6B72}
+.rm-table tbody tr[data-status]:hover{background:var(--brand-50)}
 
 /* Chi tiết ticket: mở rộng gần hết màn hình, chia 2 cột */
 .rm-drawer{width:min(1240px,100vw)}

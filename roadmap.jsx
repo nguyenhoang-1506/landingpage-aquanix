@@ -95,7 +95,7 @@
           <div className="rm-col-h"><span className="rm-dot" style={{ background: m.dot }}></span>{m.label}<span className="rm-muted" style={{ fontWeight: 400, fontSize: 13 }}>{VI[s]}</span><span className="rm-count">{col.length}</span></div>
           <div className="rm-col-bar" style={{ background: m.dot }}></div>
           {col.length === 0 && <div className="rm-col-empty">Trống</div>}
-          {col.map(t => <div key={t.code} role="button" tabIndex={0} className={'rm-card' + (drag && drag.code === t.code ? ' dragging' : '')}
+          {col.map(t => <div key={t.code} role="button" tabIndex={0} className={'rm-card' + (drag && drag.code === t.code ? ' dragging' : '')} data-status={t.status}
             draggable={canDrag} onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', t.code); setDrag(t); }}
             onDragEnd={() => { setDrag(null); setOver(null); }}
             onClick={() => onOpen(t.code)} onKeyDown={openKeys(() => onOpen(t.code))} aria-label={t.code + ': ' + t.title}>
@@ -126,7 +126,7 @@
     return <>
       <div className="rm-table-wrap"><table className="rm-table">
         <thead><tr><th>Mã</th><th>Ảnh</th><th>Mô tả</th><th>Người gửi</th><th>Trang / Section</th><th>Trạng thái</th>{sortTh('created_at', 'Ngày tạo')}{sortTh('updated_at', 'Cập nhật')}</tr></thead>
-        <tbody>{rows.map(t => <tr key={t.code} tabIndex={0} onClick={() => onOpen(t.code)} onKeyDown={openKeys(() => onOpen(t.code))}>
+        <tbody>{rows.map(t => <tr key={t.code} tabIndex={0} data-status={t.status} onClick={() => onOpen(t.code)} onKeyDown={openKeys(() => onOpen(t.code))}>
           <td><span className="rm-code">{t.code}</span></td>
           <td><Thumb t={t} className="rm-thumb" /></td>
           <td style={{ maxWidth: 340 }}><p className="rm-clamp" style={{ fontWeight: 600 }}>{t.title}</p></td>
@@ -137,7 +137,7 @@
           <td className="rm-muted" title={F.fmtFull(t.updated_at)} style={{ whiteSpace: 'nowrap' }}>{F.relTime(t.updated_at)}</td>
         </tr>)}</tbody>
       </table></div>
-      <div className="rm-mlist">{rows.map(t => <div key={t.code} role="button" tabIndex={0} className="rm-mcard" onClick={() => onOpen(t.code)} onKeyDown={openKeys(() => onOpen(t.code))}>
+      <div className="rm-mlist">{rows.map(t => <div key={t.code} role="button" tabIndex={0} className="rm-mcard" data-status={t.status} onClick={() => onOpen(t.code)} onKeyDown={openKeys(() => onOpen(t.code))}>
         <Thumb t={t} className="rm-thumb" />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}><span className="rm-code">{t.code}</span><Badge status={t.status} /></div>
