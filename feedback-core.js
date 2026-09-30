@@ -15,10 +15,10 @@
   }
 
   const STATUS = {
-    backlog: { label: 'Backlog', color: 'var(--ink-muted)', bg: 'var(--surface-sunken)', dot: '#8A9EA6' },
+    backlog: { label: 'Backlog', color: 'var(--ink-muted)', bg: 'var(--surface-sunken)', dot: '#8FB3C0' },
     doing: { label: 'Doing', color: 'var(--accent-600)', bg: 'var(--accent-100)', dot: '#FE731E' },
-    done: { label: 'Done', color: 'var(--success)', bg: 'var(--success-bg)', dot: '#0F7A4A' },
-    failed: { label: 'Failed', color: 'var(--danger)', bg: 'var(--danger-bg)', dot: '#B3241A' },
+    done: { label: 'Done', color: '#2E7D5B', bg: '#E6F4EC', dot: '#5FB58C', col: '#EEF7F2' },   // xanh lá dịu
+    failed: { label: 'Failed', color: '#5B6B72', bg: '#E9EDEF', dot: '#98A3A8', col: '#EFF1F2' }, // xám
   };
   const STATUS_ORDER = ['backlog', 'doing', 'done', 'failed'];
   const ACTOR = { reporter: 'Người gửi', admin: 'Admin', 'claude-code': 'Claude Code' };
@@ -26,6 +26,7 @@
   const ERR = {
     not_configured: 'Chưa cấu hình máy chủ góp ý (config.js).',
     invalid_description: 'Mô tả cần 10–2000 ký tự.',
+    invalid_title: 'Vấn đề gặp phải cần 5–150 ký tự.',
     invalid_name: 'Tên cần 2–60 ký tự.',
     invalid_contact: 'SĐT/Email không đúng định dạng.',
     invalid_path: 'Đường dẫn ảnh không hợp lệ.',
@@ -105,7 +106,7 @@
     },
     submit(a) {
       return rpc('submit_ticket', {
-        p_description: a.description, p_reporter_name: a.name, p_reporter_contact: a.contact || null,
+        p_title: a.title || null, p_description: a.description, p_reporter_name: a.name || null, p_reporter_contact: a.contact || null,
         p_page_url: a.pageUrl, p_page_section: a.section || null, p_viewport: a.viewport, p_user_agent: a.userAgent,
         p_raw_path: a.rawPath || null, p_annotated_path: a.annotatedPath || null,
       });
@@ -125,6 +126,7 @@
     verifyPin: pin => rpc('verify_admin_pin', { p_pin: pin }),
     setStatus: (code, status, pin, note) => rpc('set_ticket_status', { p_code: code, p_status: status, p_pin: pin, p_note: note || null }),
     getPrivate: (code, pin) => rpc('get_ticket_private', { p_code: code, p_pin: pin }),
+    deleteTicket: (code, pin) => rpc('delete_ticket', { p_code: code, p_pin: pin }),
     requestBuild: (code, pin, note) => rpc('request_build', { p_code: code, p_pin: pin, p_note: note || null }),
   };
 

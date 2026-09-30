@@ -92,6 +92,7 @@
     const [capErr, setCapErr] = React.useState(captureError);
     const [uploaded, setUploaded] = React.useState(false);
     const [fileErr, setFileErr] = React.useState(null);
+    const [title, setTitle] = React.useState('');
     const [desc, setDesc] = React.useState('');
     const [name, setName] = React.useState(saved.name || '');
     const [contact, setContact] = React.useState(saved.contact || '');
@@ -182,13 +183,14 @@
       img.src = url;
     }
 
-    const d = desc.trim(), n = name.trim(), ct = contact.trim();
+    const tt = title.trim(), d = desc.trim(), n = name.trim(), ct = contact.trim();
     const errs = {
+      title: tt.length < 5 ? 'Hãy nói ngắn gọn bạn gặp vấn đề gì (ít nhất 5 ký tự).' : tt.length > 150 ? 'Tối đa 150 ký tự.' : null,
       desc: d.length < 10 ? 'Mô tả cần ít nhất 10 ký tự.' : d.length > 2000 ? 'Mô tả tối đa 2000 ký tự.' : null,
-      name: n.length < 2 ? 'Vui lòng nhập tên (2–60 ký tự).' : n.length > 60 ? 'Tên tối đa 60 ký tự.' : null,
+      name: n && n.length < 2 ? 'Tên cần ít nhất 2 ký tự.' : n.length > 60 ? 'Tên tối đa 60 ký tự.' : null,
       contact: ct && !(EMAIL_RE.test(ct) || (PHONE_RE.test(ct) && ct.replace(/\D/g, '').length >= 9)) ? 'SĐT hoặc email chưa đúng định dạng.' : null,
     };
-    const dirty = nStrokes > 0 || uploaded || d.length > 0 || n !== (saved.name || '') || ct !== (saved.contact || '');
+    const dirty = nStrokes > 0 || uploaded || tt.length > 0 || d.length > 0 || n !== (saved.name || '') || ct !== (saved.contact || '');
 
     const requestClose = React.useCallback(() => {
       if (sending) return;
@@ -212,7 +214,7 @@
     async function submit(e) {
       e.preventDefault();
       setTried(true); setSendErr(null);
-      if (errs.desc || errs.name || errs.contact) return;
+      if (errs.title || errs.desc || errs.name || errs.contact) return;
       if (hp) return onSent(null); // honeypot: bot → giả vờ thành công
       const last = Number(store.get('aqx_fb_last') || 0);
       if (Date.now() - last < COOLDOWN) { setWaitUntil(last + COOLDOWN); return; }
@@ -227,7 +229,7 @@
           rawPath = `${ym}/${id}-raw.${ext(rb)}`; annotatedPath = `${ym}/${id}-annotated.${ext(ab)}`;
           await Promise.all([api.upload(rawPath, rb), api.upload(annotatedPath, ab)]);
         }
-        const res = await api.submit({ description: d, name: n, contact: ct, rawPath, annotatedPath, ...context });
+        const res = await api.submit({ title: tt, description: d, name: n, contact: ct, rawPath, annotatedPath, ...context });
         if (!res || !res.ok) throw (res || new Error('Gửi không thành công.'));
         store.set('aqx_fb_reporter', JSON.stringify({ name: n, contact: ct }));
         store.set('aqx_fb_last', String(Date.now()));
@@ -261,20 +263,23 @@
         <span className="fb-grab" aria-hidden="true"></span>
         <div>
           <h2>Góp ý</h2>
-          <p className="t-body" style={{ margin: '4px 0 0', color: 'var(--ink-muted)' }}>Khoanh vùng bằng bút đỏ trên ảnh, rồi mô tả lỗi hoặc đề xuất của bạn.</p>
+          <p className="t-body" style={{ margin: '4px 0 0', color: 'var(--ink-muted)' }}>Khoanh vùng bằng bút đỏ trên ảnh, rồi trả lời 2 câu hỏi bên dưới.</p>
         </div>
         {capErr && base == null && <p className="fb-alert warn">Không chụp được màn hình, bạn có thể tải ảnh lên (PNG/JPG/WebP ≤ 5MB).</p>}
         {fileErr && <p className="fb-alert stop">{fileErr}</p>}
+        <FieldInput label="1. Vấn đề bạn gặp phải *" value={title} onChange={e => setTitle(e.target.value)} maxLength={150} autoFocus={window.innerWidth > 760}
+          placeholder="Ví dụ: Nút Tải app bị che trên điện thoại" error={tried ? errs.title : null} />
         <label style={{ display: 'block' }}>
-          <span className="fb-label"><span>Mô tả *</span><em style={{ color: d.length > 2000 ? 'var(--danger)' : undefined }}>{d.length}/2000</em></span>
-          <textarea className={'fb-textarea' + (tried && errs.desc ? ' err' : '')} value={desc} onChange={e => setDesc(e.target.value)} maxLength={2200} autoFocus={window.innerWidth > 760}
-            placeholder="Ví dụ: Nút Tải app trên điện thoại bị che mất một nửa." aria-invalid={!!(tried && errs.desc)} />
+          <span className="fb-label"><span>2. Mô tả và gợi ý giải quyết *</span><em style={{ color: d.length > 2000 ? 'var(--danger)' : undefined }}>{d.length}/2000</em></span>
+          <textarea className={'fb-textarea' + (tried && errs.desc ? ' err' : '')} value={desc} onChange={e => setDesc(e.target.value)} maxLength={2200}
+            placeholder="Ví dụ: Khi mở trên iPhone, nút bị che mất một nửa. Nên dời nút lên trên hoặc thu nhỏ ảnh lại." aria-invalid={!!(tried && errs.desc)} />
           {tried && errs.desc && <span className="fb-err">{errs.desc}</span>}
         </label>
-        <FieldInput label="Tên của bạn *" value={name} onChange={e => setName(e.target.value)} maxLength={60} autoComplete="name" error={tried ? errs.name : null} />
-        <FieldInput label="SĐT / Email (không bắt buộc)" value={contact} onChange={e => setContact(e.target.value)} maxLength={120} autoComplete="email" error={tried ? errs.contact : null} hint="Chỉ đội ngũ Aquanix thấy, để liên hệ khi cần." />
+        <div className="fb-label" style={{ marginBottom: -8 }}><span>3. Thông tin liên hệ</span><em>không bắt buộc</em></div>
+        <FieldInput label="Tên của bạn" value={name} onChange={e => setName(e.target.value)} maxLength={60} autoComplete="name" error={tried ? errs.name : null} />
+        <FieldInput label="SĐT / Email" value={contact} onChange={e => setContact(e.target.value)} maxLength={120} autoComplete="email" error={tried ? errs.contact : null} hint="Chỉ đội ngũ Aquanix thấy, để liên hệ khi cần." />
         <label className="fb-hp" aria-hidden="true">Website<input tabIndex={-1} autoComplete="off" value={hp} onChange={e => setHp(e.target.value)} name="website" /></label>
-        <p className="fb-note">Ảnh chụp, mô tả và tên sẽ hiển thị công khai trên trang Phát triển sản phẩm.</p>
+        <p className="fb-note">Ảnh chụp, nội dung góp ý và tên (nếu có) sẽ hiển thị công khai trên trang Phát triển sản phẩm.</p>
         {waitLeft > 0 && <p className="fb-alert warn">Bạn vừa gửi góp ý. Vui lòng chờ {waitLeft} giây rồi gửi tiếp.</p>}
         {sendErr && <p className="fb-alert stop" role="alert">{sendErr} Nội dung vẫn được giữ nguyên.</p>}
         <div className="fb-actions">

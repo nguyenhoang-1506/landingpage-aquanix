@@ -51,13 +51,14 @@ jobs:
           ADMIN_NOTE: ${{ inputs.note }}
         run: |
           node scripts/tickets.mjs show "$CODE" --no-contact > /dev/null
-          node scripts/tickets.mjs build "$CODE" --state running --note "Claude đang phân tích và sửa…"
+          node scripts/tickets.mjs build "$CODE" --state running --log "$RUN_URL" --note "Claude đang phân tích và sửa…"
           if [ -n "$ADMIN_NOTE" ]; then printf '%s\n' "$ADMIN_NOTE" > ".tickets/$CODE/admin-note.txt"; fi
           git checkout -B "ticket/$CODE"
 
       # Bước này KHÔNG có service key / GitHub token trong env, và Claude chỉ có công cụ đọc/sửa file
       # (không Bash, không mạng) — vì nội dung ticket là dữ liệu do người lạ gửi.
       - name: Run Claude Code
+        id: claude
         env:
           TOKEN_RAW: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
         run: |
@@ -70,12 +71,24 @@ jobs:
             *) echo "::error::Secret CLAUDE_CODE_OAUTH_TOKEN không phải mã từ 'claude setup-token' (phải bắt đầu bằng sk-ant-oat), dài ${#CLAUDE_CODE_OAUTH_TOKEN} ký tự"; exit 1 ;;
           esac
           npm install -g @anthropic-ai/claude-code >/dev/null 2>&1
+          LOG="$RUNNER_TEMP/claude.jsonl"
+          START=$(date +%s)
+          set +e
           claude -p "Mã ticket: $CODE. Thư mục đầu vào: .tickets/$CODE/
 
           $(cat .github/ticket-prompt.md)" \
+            --model claude-opus-5-5 \
             --allowedTools "Read,Edit,Write,Glob,Grep" \
             --permission-mode acceptEdits \
-            --max-turns 60
+            --max-turns 80 \
+            --output-format stream-json --verbose > "$LOG"
+          RC=$?
+          set -e
+          echo "seconds=$(( $(date +%s) - START ))" >> "$GITHUB_OUTPUT"
+          echo "::group::Nhật ký Claude (từng bước)"
+          node scripts/claude-log.mjs "$LOG"
+          echo "::endgroup::"
+          exit $RC
 
       - name: Commit to preview branch
         id: commit
@@ -104,8 +117,8 @@ jobs:
         run: |
           URL=$(gh pr list --head "ticket/$CODE" --base main --state open --json url --jq '.[0].url // empty')
           if [ -z "$URL" ]; then
-            BODY=".tickets/$CODE/summary.md"
-            [ -f "$BODY" ] || echo "Sửa theo góp ý $CODE." > "$BODY"
+            BODY="$RUNNER_TEMP/pr-body.md"
+            cp ".tickets/$CODE/summary.md" "$BODY" 2>/dev/null || echo "Sửa theo góp ý $CODE." > "$BODY"
             printf '\n\nTicket: https://landingpage-aquanix.vercel.app/roadmap?ticket=%s\n' "$CODE" >> "$BODY"
             URL=$(gh pr create --head "ticket/$CODE" --base main --title "$(git log -1 --format=%s)" --body-file "$BODY" 2>/dev/null || true)
           fi
@@ -136,19 +149,21 @@ jobs:
           CHANGED: ${{ steps.commit.outputs.changed }}
           PREVIEW_URL: ${{ steps.preview.outputs.url }}
           PR_URL: ${{ steps.pr.outputs.url }}
+          SECS: ${{ steps.claude.outputs.seconds }}
         run: |
           SUMMARY=".tickets/$CODE/summary.md"
           if [ "$CHANGED" = "true" ]; then
-            ARGS=(--state preview --diff "$PR_URL")
+            ARGS=(--state preview --diff "$PR_URL" --seconds "$SECS")
             [ -n "$PREVIEW_URL" ] && ARGS+=(--preview "$PREVIEW_URL")
             node scripts/tickets.mjs build "$CODE" "${ARGS[@]}" --note "Claude đã sửa xong, chờ duyệt." --note-file "$SUMMARY"
           else
-            node scripts/tickets.mjs build "$CODE" --state failed --note "Claude không sửa code cho góp ý này." --note-file "$SUMMARY"
+            node scripts/tickets.mjs build "$CODE" --state failed --seconds "$SECS" --note "Claude chưa sửa gì cho góp ý này." --note-file "$SUMMARY"
           fi
 
       - name: Report failure
         if: failure() || cancelled()
         env:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SECS: ${{ steps.claude.outputs.seconds }}
         run: |
-          node scripts/tickets.mjs build "$CODE" --state failed --note "Build lỗi hoặc bị huỷ. Xem log: $RUN_URL" || true
+          node scripts/tickets.mjs build "$CODE" --state failed --seconds "$SECS" --note "Lần chạy này gặp lỗi kỹ thuật. Bạn có thể bấm Build lại, hoặc mở nhật ký để xem chi tiết." || true

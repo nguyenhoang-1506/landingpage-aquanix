@@ -132,7 +132,10 @@ async function build(env, args) {
   if (noteFile && existsSync(noteFile)) note = readFileSync(noteFile, 'utf8').trim().slice(0, 2000) || note;
   const res = await api(env, '/rest/v1/rpc/set_ticket_build', {
     method: 'POST',
-    body: JSON.stringify({ p_code: code, p_state: str('state'), p_preview_url: str('preview'), p_diff_url: str('diff'), p_note: note }),
+    body: JSON.stringify({
+      p_code: code, p_state: str('state'), p_preview_url: str('preview'), p_diff_url: str('diff'), p_note: note,
+      p_log_url: str('log'), p_seconds: /^\d+$/.test(str('seconds') || '') ? Number(str('seconds')) : null,
+    }),
   });
   if (!res || !res.ok) fail('Không cập nhật được build: ' + JSON.stringify(res));
   console.log(`✔ ${code} build → ${res.build_status}`);
