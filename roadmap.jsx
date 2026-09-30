@@ -295,60 +295,96 @@
     return null;
   }
 
-  function BuildBox({ ticket, isAdmin, askAdmin, onBuild, onReview, onImage }) {
-    const [note, setNote] = React.useState('');
-    const [busy, setBusy] = React.useState(false);
-    const [err, setErr] = React.useState(null);
-    async function review(approve) {
-      if (!F.admin.pin() && !(await askAdmin())) return;
-      if (!window.confirm(approve ? 'Đưa thay đổi này lên trang chính thức? Khách sẽ thấy ngay sau khoảng 1 phút.' : 'Từ chối bản xem trước này? Thay đổi của Claude sẽ bị bỏ.')) return;
-      setBusy(true); setErr(null);
-      const r = await onReview(ticket, approve);
-      setBusy(false);
-      if (!r || !r.ok) setErr(r ? r.message : 'Có lỗi xảy ra.');
-    }
-    const bs = ticket.build_status, meta = BUILD[bs];
-    const building = isBuilding(ticket);
-    const canBuild = ['backlog', 'doing'].includes(ticket.status) && !building;
-    if (!bs && !(canBuild && isAdmin)) return null; // khách chỉ thấy khi đã có tiến độ build
-    async function go() {
-      if (!F.admin.pin() && !(await askAdmin())) return;
-      setBusy(true); setErr(null);
-      const r = await onBuild(ticket, note.trim());
-      setBusy(false);
-      if (r && r.ok) setNote(''); else setErr(r ? r.message : 'Có lỗi xảy ra.');
-    }
-    return <div className="rm-box">
-      <h3>Build by Claude</h3>
-      {meta && <p className="fb-alert" style={{ background: meta[1], color: meta[2], margin: 0, display: 'flex', gap: 8, alignItems: 'center' }}>
+  // Mục thu gọn / mở rộng được, nhớ trạng thái theo từng mục
+  function Section({ id, title, right, defaultOpen = true, children }) {
+    const key = 'aqx_rm_sec_' + id;
+    const [open, setOpen] = React.useState(() => { const v = F.store.get(key); return v == null ? defaultOpen : v === '1'; });
+    const toggle = () => setOpen(o => { F.store.set(key, o ? '0' : '1'); return !o; });
+    return <section className={'rm-sec' + (open ? ' open' : '')}>
+      <header className="rm-sec-h">
+        <button type="button" className="rm-sec-toggle" onClick={toggle} aria-expanded={open}>
+          <span className="rm-sec-caret" aria-hidden="true">▸</span>{title}
+        </button>
+        {right && <div className="rm-sec-right">{right}</div>}
+      </header>
+      {open && <div className="rm-sec-b">{children}</div>}
+    </section>;
+  }
+
+  // Thanh tiến trình: Tiếp nhận → Claude xử lý → Chờ duyệt → Hoàn thành
+  function Stepper({ t }) {
+    const bs = t.build_status, building = isBuilding(t);
+    let cur = 0;
+    if (t.status === 'done') cur = 4;
+    else if (t.status === 'failed') cur = 3;
+    else if (bs === 'preview' || bs === 'merging') cur = 2;
+    else if (t.status === 'doing') cur = 1;
+    const failed = t.status === 'failed';
+    const steps = [
+      ['Tiếp nhận', F.fmtFull(t.created_at)],
+      ['Claude xử lý', building && bs !== 'merging' ? 'Đang làm…' : t.build_started_at ? F.fmtFull(t.build_started_at) : t.status === 'doing' ? 'Đang xử lý' : ''],
+      ['Chờ duyệt', bs === 'merging' ? 'Đang đưa lên…' : bs === 'preview' ? 'Có bản xem trước' : ''],
+      [failed ? 'Không thực hiện' : 'Hoàn thành', (t.status === 'done' || failed) ? F.fmtFull(t.status_changed_at) : ''],
+    ];
+    return <ol className="rm-stepper" aria-label="Tiến trình">
+      {steps.map(([label, sub], i) => {
+        const state = i < cur || (i === 3 && cur === 4) ? 'done' : i === cur ? 'cur' : 'todo';
+        const cls = 'rm-step ' + state + (failed && i === 3 ? ' failed' : '');
+        return <li key={i} className={cls}>
+          <span className="rm-step-dot" aria-hidden="true">{state === 'done' ? '✓' : failed && i === 3 ? '✕' : i + 1}</span>
+          <span className="rm-step-txt"><b>{label}</b>{sub && <small>{sub}</small>}</span>
+        </li>;
+      })}
+    </ol>;
+  }
+
+  // Menu "Thêm hành động"
+  function MoreMenu({ items }) {
+    const [open, setOpen] = React.useState(false);
+    const ref = React.useRef(null);
+    React.useEffect(() => {
+      if (!open) return;
+      const h = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+      document.addEventListener('mousedown', h);
+      return () => document.removeEventListener('mousedown', h);
+    }, [open]);
+    const list = items.filter(Boolean);
+    if (!list.length) return null;
+    return <div className="rm-more" ref={ref}>
+      <button type="button" className="rm-btn ghost" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(o => !o)}>Thêm hành động <span aria-hidden="true">▾</span></button>
+      {open && <div className="rm-menu" role="menu">
+        {list.map(([label, fn, danger]) => <button key={label} type="button" role="menuitem" className={danger ? 'danger' : ''} onClick={() => { setOpen(false); fn(); }}>{label}</button>)}
+      </div>}
+    </div>;
+  }
+
+  // Nội dung mục "Claude xử lý": trạng thái, báo cáo (Markdown), các bước, phản hồi để Claude sửa tiếp
+  function ClaudePanel({ ticket, isAdmin, onImage, note, setNote, onSend, busy, err, canBuild }) {
+    const bs = ticket.build_status, meta = BUILD[bs], building = isBuilding(ticket);
+    return <div className="rm-claude">
+      {meta && <p className="fb-alert rm-claude-status" style={{ background: meta[1], color: meta[2] }}>
         {building && <span className="fb-spin" aria-hidden="true" style={{ borderColor: 'rgba(0,0,0,.15)', borderTopColor: 'currentColor' }}></span>}
         <b>{meta[0]}</b>
       </p>}
-      {bs && <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-        <BuildTimer ticket={ticket} building={building} />
-        {ticket.build_log_url && <a className="rm-loglink" href={ticket.build_log_url} target="_blank" rel="noopener">Xem nhật ký</a>}
-      </div>}
+      {!bs && <p className="rm-muted" style={{ margin: 0 }}>{isAdmin ? 'Claude chưa xử lý góp ý này. Bấm Build by Claude ở góc trên để bắt đầu.' : 'Góp ý này chưa được xử lý.'}</p>}
       {ticket.build_note && !building && <div className="rm-claude-note">
-        <div className="rm-claude-head"><span className="rm-claude-avatar" aria-hidden="true">✳</span><b>Claude</b></div>
+        <div className="rm-claude-head"><span className="rm-claude-avatar" aria-hidden="true">✳</span><b>Claude</b>
+          {ticket.build_seconds != null && <span className="rm-muted" style={{ fontWeight: 400, fontSize: 13 }}>· suy nghĩ {fmtDur(ticket.build_seconds)}</span>}</div>
         <Md text={ticket.build_note} onImage={onImage} />
       </div>}
       {!building && <BuildSteps steps={ticket.build_steps} />}
-      {bs === 'preview' && <div className="rm-review">
-        <div className="rm-review-links">
-          {ticket.preview_url && <a href={ticket.preview_url} target="_blank" rel="noopener">Mở bản xem trước ↗</a>}
-          {ticket.diff_url && <a href={ticket.diff_url} target="_blank" rel="noopener" className="rm-muted">Xem thay đổi trên GitHub ↗</a>}
+      {bs === 'preview' && <div className="rm-review-links">
+        {ticket.preview_url && <a href={ticket.preview_url} target="_blank" rel="noopener">Mở bản xem trước ↗</a>}
+        {ticket.diff_url && <a href={ticket.diff_url} target="_blank" rel="noopener" className="rm-muted">Xem thay đổi trên GitHub ↗</a>}
+      </div>}
+      {canBuild && isAdmin && <div className="rm-reply">
+        <textarea className="rm-textarea" value={note} maxLength={1000} onChange={e => setNote(e.target.value)}
+          placeholder={bs ? 'Phản hồi cho Claude để sửa tiếp, ví dụ: giữ câu hỏi cũ, chỉ đổi câu trả lời…' : 'Chỉ dẫn thêm cho Claude (không bắt buộc), ví dụ: chỉ sửa trên điện thoại.'} />
+        <div className="rm-reply-bar">
+          {err ? <span className="rm-err" role="alert">{err}</span> : <span className="rm-muted" style={{ fontSize: 13 }}>{bs ? 'Claude sẽ làm lại từ bản mới nhất, kèm phản hồi của bạn.' : ''}</span>}
+          <Button size="sm" variant="accent" disabled={busy} onClick={onSend}>{busy ? 'Đang gửi…' : bs ? 'Gửi & build lại' : 'Build by Claude'}</Button>
         </div>
-        {isAdmin ? <div className="rm-actions">
-          <Button size="sm" variant="secondary" disabled={busy} onClick={() => review(false)}>Từ chối</Button>
-          <Button size="sm" disabled={busy} onClick={() => review(true)}>{busy ? 'Đang gửi…' : 'Duyệt & đưa lên'}</Button>
-        </div> : <p className="rm-muted" style={{ margin: 0, fontSize: 13 }}>Đang chờ admin duyệt.</p>}
-      </div>}      {canBuild && isAdmin && <>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}><span className="rm-lbl">Chỉ dẫn thêm cho Claude (không bắt buộc)</span>
-          <textarea className="rm-textarea" value={note} maxLength={1000} onChange={e => setNote(e.target.value)} placeholder="Ví dụ: chỉ sửa trên mobile, giữ nguyên desktop." />
-        </label>
-        {err && <p className="rm-err" role="alert">{err}</p>}
-        <div><Button size="sm" variant="accent" disabled={busy} onClick={go}>{busy ? 'Đang gửi…' : bs ? 'Build lại bằng Claude' : 'Build by Claude'}</Button></div>
-      </>}
+      </div>}
     </div>;
   }
 
@@ -403,15 +439,13 @@
     const [which, setWhich] = React.useState('annotated');
     const [zoom, setZoom] = React.useState(null); // src ảnh đang phóng to
     const [editing, setEditing] = React.useState(false);
+    const [full, setFull] = React.useState(() => F.store.get('aqx_rm_full') === '1');
+    const [note, setNote] = React.useState('');
+    const [busy, setBusy] = React.useState(false);
+    const [err, setErr] = React.useState(null);
     const closeRef = React.useRef(null);
-    const [delBusy, setDelBusy] = React.useState(false);
-    const [delErr, setDelErr] = React.useState(null);
-    async function del() {
-      if (!window.confirm(`Xoá hẳn góp ý ${code}? Không khôi phục lại được.`)) return;
-      setDelBusy(true); setDelErr(null);
-      const r = await onDelete(ticket);
-      if (!r || !r.ok) { setDelBusy(false); setDelErr(r ? r.message : 'Có lỗi xảy ra.'); }
-    }
+    const claudeRef = React.useRef(null);
+    const toggleFull = () => setFull(f => { F.store.set('aqx_rm_full', f ? '0' : '1'); return !f; });
 
     React.useEffect(() => { closeRef.current && closeRef.current.focus(); }, []);
     React.useEffect(() => {
@@ -438,73 +472,126 @@
       return () => { off = true; };
     }, [code, !!ticket, isAdmin]);
 
-    const ann = ticket && F.publicUrl(ticket.screenshot_annotated_path);
-    const raw = ticket && F.publicUrl(ticket.screenshot_raw_path);
+    const ensureAdmin = async () => F.admin.pin() || (await askAdmin());
+    async function run(fn) { setBusy(true); setErr(null); const r = await fn(); setBusy(false); if (!r || !r.ok) setErr(r ? r.message : 'Có lỗi xảy ra.'); return r; }
+    async function build() {
+      if (!(await ensureAdmin())) return;
+      const r = await run(() => onBuild(ticket, note.trim()));
+      if (r && r.ok) setNote('');
+    }
+    async function review(approve) {
+      if (!(await ensureAdmin())) return;
+      if (!window.confirm(approve ? 'Đưa thay đổi này lên trang chính thức? Khách sẽ thấy sau khoảng 1 phút.' : 'Từ chối bản xem trước này? Thay đổi của Claude sẽ bị bỏ.')) return;
+      run(() => onReview(ticket, approve));
+    }
+    async function del() {
+      if (!(await ensureAdmin())) return;
+      if (!window.confirm(`Xoá hẳn góp ý ${code}? Không khôi phục lại được.`)) return;
+      run(() => onDelete(ticket));
+    }
+    const focusClaude = () => { F.store.set('aqx_rm_sec_claude', '1'); claudeRef.current && claudeRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+
+    const t = ticket;
+    const ann = t && F.publicUrl(t.screenshot_annotated_path);
+    const raw = t && F.publicUrl(t.screenshot_raw_path);
     const img = which === 'raw' ? (raw || ann) : (ann || raw);
+    const building = t && isBuilding(t);
+    const bs = t && t.build_status;
+    const open = t && ['backlog', 'doing'].includes(t.status);
+    const canBuild = open && !building;
+
+    // Nút hành động chính ở góc phải trên
+    let cta = null;
+    if (t && !isAdmin) cta = <button type="button" className="rm-btn" onClick={() => askAdmin()}>{Ico.lock} Chế độ admin</button>;
+    else if (t && bs === 'preview') cta = <>
+      <button type="button" className="rm-btn ok" disabled={busy} onClick={() => review(true)}>✓ Duyệt & đưa lên</button>
+      <button type="button" className="rm-btn no" disabled={busy} onClick={() => review(false)}>✕ Từ chối</button>
+    </>;
+    else if (t && building) cta = <button type="button" className="rm-btn" disabled><span className="fb-spin" aria-hidden="true" style={{ borderColor: 'rgba(0,0,0,.15)', borderTopColor: 'currentColor' }}></span> {bs === 'merging' ? 'Đang đưa lên…' : 'Claude đang làm…'}</button>;
+    else if (t && canBuild) cta = <button type="button" className="rm-btn claude" disabled={busy} onClick={bs ? focusClaude : build}>✳ {bs ? 'Build lại bằng Claude' : 'Build by Claude'}</button>;
+
+    const more = t && isAdmin ? [
+      open && ['Sửa nội dung phiếu', () => setEditing(true)],
+      bs === 'preview' && canBuild && ['Phản hồi để Claude sửa tiếp', focusClaude],
+      t.preview_url && bs === 'preview' && ['Mở bản xem trước', () => window.open(t.preview_url, '_blank', 'noopener')],
+      t.diff_url && ['Xem thay đổi trên GitHub', () => window.open(t.diff_url, '_blank', 'noopener')],
+      t.build_log_url && ['Xem nhật ký Claude', () => window.open(t.build_log_url, '_blank', 'noopener')],
+      t.commit_url && ['Xem commit đã đưa lên', () => window.open(t.commit_url, '_blank', 'noopener')],
+      t.status !== 'done' && ['Xoá góp ý', del, true],
+    ] : [];
 
     return <>
       <div className="rm-back" onClick={onClose}></div>
-      <aside className="rm-drawer" role="dialog" aria-modal="true" aria-label={'Chi tiết ' + code}>
-        <div className="rm-drawer-h">
-          <span className="rm-code" style={{ fontSize: 15 }}>{code}</span>
-          {ticket && <Badge status={ticket.status} />}
-          <button ref={closeRef} type="button" className="rm-x" onClick={onClose} aria-label="Đóng">×</button>
-        </div>
-        <div className="rm-drawer-b">
-          {!ticket ? <div className="rm-empty"><h3>{loaded ? 'Không tìm thấy ticket' : 'Đang tải…'}</h3>{loaded && <p>Mã {code} không tồn tại hoặc đã bị xoá.</p>}</div> : <>
-            <div className="rm-detail"><div className="rm-detail-main">
-            {editing ? <EditForm ticket={ticket} onCancel={() => setEditing(false)} onSave={async (t, d) => { const r = await onEdit(ticket, t, d); if (r && r.ok) setEditing(false); return r; }} />
-              : <div>
-                <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                  <h2 className="rm-title" style={{ flex: 1 }}>{ticket.title}</h2>
-                  {isAdmin && ['backlog', 'doing'].includes(ticket.status) && <button type="button" className="rm-link" style={{ flex: 'none' }} onClick={() => setEditing(true)}>Sửa nội dung</button>}
-                </div>
-                {ticket.description.trim() !== ticket.title.trim() && <p className="rm-desc">{ticket.description}</p>}
-              </div>}
-            {img && <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-              {ann && raw && <div className="rm-seg" role="group" aria-label="Chọn ảnh" style={{ alignSelf: 'flex-start' }}>
-                <button type="button" aria-pressed={which === 'annotated'} onClick={() => setWhich('annotated')}>Ảnh đã vẽ</button>
-                <button type="button" aria-pressed={which === 'raw'} onClick={() => setWhich('raw')}>Ảnh gốc</button>
-              </div>}
-              <img className="rm-shot" src={img} alt={'Ảnh chụp màn hình của ' + code} onClick={() => setZoom(img)} />
-            </div>}
-            <Attachments list={ticket.attachments} onImage={setZoom} />
-            <BuildBox key={'b' + version} ticket={ticket} isAdmin={isAdmin} askAdmin={askAdmin} onBuild={onBuild} onReview={onReview} onImage={setZoom} />
-            {ticket.status === 'done' && ticket.commit_url && <p className="fb-alert" style={{ background: 'var(--success-bg)', color: 'var(--success)', margin: 0 }}>
-              Đã sửa trong commit <a href={ticket.commit_url} target="_blank" rel="noopener" style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{(ticket.commit_sha || '').slice(0, 7)}</a> trên GitHub.
-            </p>}
-            {ticket.status_note && <p className="fb-alert" style={{ background: 'var(--surface-sunken)', color: 'var(--ink)', margin: 0 }}><b>Ghi chú: </b>{ticket.status_note}</p>}
-            </div><div className="rm-detail-side">
-            <dl className="rm-dl">
-              <dt>Người gửi</dt><dd>{ticket.reporter_name}</dd>
-              {isAdmin && <><dt>SĐT / Email</dt><dd>{contact === undefined ? '…' : contact || <span className="rm-muted">Không để lại</span>}</dd></>}
-              <dt>Ngày tạo</dt><dd>{F.fmtFull(ticket.created_at)}</dd>
-              <dt>Cập nhật</dt><dd>{F.fmtFull(ticket.updated_at)}</dd>
-              <dt>Trang</dt><dd>{ticket.page_url ? <a href={ticket.page_url} target="_blank" rel="noopener">{pageLabel(ticket)}</a> : '—'}</dd>
-              <dt>Màn hình</dt><dd>{ticket.viewport || '—'}</dd>
-              <dt>Trình duyệt</dt><dd title={ticket.user_agent}>{F.browserName(ticket.user_agent) || '—'}</dd>
-            </dl>
-            <div className="rm-box">
-              <h3>Đổi trạng thái</h3>
-              {isAdmin
-                ? <StatusForm key={ticket.status + version} ticket={ticket} compact onApply={onApply} />
-                : <div><Button size="sm" variant="secondary" icon={Ico.lock} onClick={() => askAdmin()}>Mở chế độ admin</Button></div>}
+      <aside className={'rm-drawer v2' + (full ? ' full' : '')} role="dialog" aria-modal="true" aria-label={'Chi tiết ' + code}>
+        <header className="rm-dh">
+          <div className="rm-dh-top">
+            <div className="rm-dh-title">
+              <div className="rm-dh-sub"><span className="rm-code">{code}</span>{t && <Badge status={t.status} />}{t && <span className="rm-muted">{t.reporter_name} · {F.relTime(t.created_at)}</span>}</div>
+              <h2>{t ? t.title : code}</h2>
             </div>
-            <div className="rm-box">
-              <h3>Lịch sử trạng thái</h3>
+            <div className="rm-dh-actions">
+              {cta}
+              <MoreMenu items={more} />
+              <button type="button" className="rm-icon" onClick={toggleFull} title={full ? 'Thu nhỏ' : 'Mở rộng toàn màn hình'} aria-label={full ? 'Thu nhỏ' : 'Mở rộng toàn màn hình'}>{full ? '⤡' : '⤢'}</button>
+              <button ref={closeRef} type="button" className="rm-icon" onClick={onClose} aria-label="Đóng">×</button>
+            </div>
+          </div>
+          {err && <p className="rm-err" role="alert" style={{ margin: '8px 0 0' }}>{err}</p>}
+          {t && <Stepper t={t} />}
+        </header>
+        <div className="rm-db">
+          {!t ? <div className="rm-empty"><h3>{loaded ? 'Không tìm thấy ticket' : 'Đang tải…'}</h3>{loaded && <p>Mã {code} không tồn tại hoặc đã bị xoá.</p>}</div> : <>
+            <Section id="info" title="Thông tin phiếu" right={isAdmin && open && !editing && <button type="button" className="rm-link" onClick={() => setEditing(true)}>Sửa nội dung</button>}>
+              {editing
+                ? <EditForm ticket={t} onCancel={() => setEditing(false)} onSave={async (a, b) => { const r = await onEdit(t, a, b); if (r && r.ok) setEditing(false); return r; }} />
+                : <div className="rm-info-desc">
+                  <span className="rm-lbl">Mô tả và gợi ý</span>
+                  <p className="rm-desc">{t.description}</p>
+                </div>}
+              <div className="rm-info-grid">
+                {img && <div className="rm-info-shot">
+                  {ann && raw && <div className="rm-seg" role="group" aria-label="Chọn ảnh">
+                    <button type="button" aria-pressed={which === 'annotated'} onClick={() => setWhich('annotated')}>Ảnh đã vẽ</button>
+                    <button type="button" aria-pressed={which === 'raw'} onClick={() => setWhich('raw')}>Ảnh gốc</button>
+                  </div>}
+                  <img className="rm-shot" src={img} alt={'Ảnh chụp màn hình của ' + code} onClick={() => setZoom(img)} />
+                </div>}
+                <dl className="rm-dl">
+                  <dt>Người gửi</dt><dd>{t.reporter_name}</dd>
+                  {isAdmin && <><dt>SĐT / Email</dt><dd>{contact === undefined ? '…' : contact || <span className="rm-muted">Không để lại</span>}</dd></>}
+                  <dt>Ngày tạo</dt><dd>{F.fmtFull(t.created_at)}</dd>
+                  <dt>Cập nhật</dt><dd>{F.fmtFull(t.updated_at)}</dd>
+                  <dt>Trang</dt><dd>{t.page_url ? <a href={t.page_url} target="_blank" rel="noopener">{pageLabel(t)}</a> : '—'}</dd>
+                  <dt>Màn hình</dt><dd>{t.viewport || '—'} · {F.browserName(t.user_agent) || '—'}</dd>
+                  {t.commit_url && <><dt>Đã đưa lên</dt><dd><a href={t.commit_url} target="_blank" rel="noopener" style={{ fontFamily: 'var(--font-mono)' }}>{(t.commit_sha || '').slice(0, 7)}</a></dd></>}
+                  {t.status_note && <><dt>Ghi chú</dt><dd>{t.status_note}</dd></>}
+                </dl>
+              </div>
+              <Attachments list={t.attachments} onImage={setZoom} />
+            </Section>
+
+            <div ref={claudeRef}>
+              <Section id="claude" title={<>Claude xử lý</>} right={<>
+                {bs && <BuildTimer ticket={t} building={building} />}
+                {t.build_log_url && <a className="rm-loglink" href={t.build_log_url} target="_blank" rel="noopener">Nhật ký</a>}
+              </>}>
+                <ClaudePanel key={'c' + version} ticket={t} isAdmin={isAdmin} onImage={setZoom} note={note} setNote={setNote} onSend={build} busy={busy} err={null} canBuild={canBuild} />
+              </Section>
+            </div>
+
+            {isAdmin && <Section id="status" title="Đổi trạng thái" defaultOpen={false}>
+              <StatusForm key={t.status + version} ticket={t} compact onApply={onApply} />
+            </Section>}
+
+            <Section id="history" title={`Lịch sử${events ? ` (${events.length})` : ''}`} defaultOpen={false}>
               {events == null ? <p className="rm-muted" style={{ margin: 0 }}>Đang tải…</p> : events.length === 0 ? <p className="rm-muted" style={{ margin: 0 }}>Chưa có.</p> :
                 <ol className="rm-tl">{events.slice().reverse().map(ev => <li key={ev.id}>
                   <span className="rm-dot" style={{ background: STATUS[ev.to_status].dot }}></span>
-                  <div className="rm-tl-t">{ev.from_status ? `${STATUS[ev.from_status].label} → ${STATUS[ev.to_status].label}` : `Tạo ticket · ${STATUS[ev.to_status].label}`}</div>
+                  <div className="rm-tl-t">{!ev.from_status ? `Tạo phiếu · ${STATUS[ev.to_status].label}` : ev.from_status === ev.to_status ? (ev.note || 'Cập nhật') : `${STATUS[ev.from_status].label} → ${STATUS[ev.to_status].label}`}</div>
                   <div className="rm-tl-s">{ACTOR[ev.actor] || ev.actor} · {F.fmtFull(ev.created_at)}</div>
-                  {ev.note && <p className="rm-tl-n">{ev.note}</p>}
+                  {ev.note && ev.from_status !== ev.to_status && <p className="rm-tl-n">{ev.note}</p>}
                 </li>)}</ol>}
-            </div>
-            {isAdmin && ticket.status !== 'done' && <div>
-              <button type="button" className="rm-danger" onClick={del} disabled={delBusy}>{delBusy ? 'Đang xoá…' : 'Xoá góp ý này'}</button>
-              {delErr && <p className="rm-err" role="alert" style={{ marginTop: 6 }}>{delErr}</p>}
-            </div>}
-            </div></div>
+            </Section>
           </>}
         </div>
       </aside>
