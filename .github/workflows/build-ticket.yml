@@ -59,8 +59,16 @@ jobs:
       # (không Bash, không mạng) — vì nội dung ticket là dữ liệu do người lạ gửi.
       - name: Run Claude Code
         env:
-          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          TOKEN_RAW: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
         run: |
+          # mã copy từ terminal hay dính xuống dòng/khoảng trắng → lọc bỏ
+          export CLAUDE_CODE_OAUTH_TOKEN="$(printf '%s' "$TOKEN_RAW" | tr -d '[:space:]')"
+          unset TOKEN_RAW
+          case "$CLAUDE_CODE_OAUTH_TOKEN" in
+            sk-ant-oat*) echo "Token: đúng dạng sk-ant-oat…, dài ${#CLAUDE_CODE_OAUTH_TOKEN} ký tự" ;;
+            "") echo "::error::Secret CLAUDE_CODE_OAUTH_TOKEN đang trống"; exit 1 ;;
+            *) echo "::error::Secret CLAUDE_CODE_OAUTH_TOKEN không phải mã từ 'claude setup-token' (phải bắt đầu bằng sk-ant-oat), dài ${#CLAUDE_CODE_OAUTH_TOKEN} ký tự"; exit 1 ;;
+          esac
           npm install -g @anthropic-ai/claude-code >/dev/null 2>&1
           claude -p "Mã ticket: $CODE. Thư mục đầu vào: .tickets/$CODE/
 
