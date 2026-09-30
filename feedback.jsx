@@ -27,7 +27,8 @@
     });
     return h2cPromise;
   }
-  const nextFrame = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+  // chờ 2 khung hình để popup kịp đóng; tab bị ẩn thì requestAnimationFrame không chạy → tối đa 150ms
+  const nextFrame = () => new Promise(r => { requestAnimationFrame(() => requestAnimationFrame(r)); setTimeout(r, 150); });
   const withTimeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
 
   function currentSection() {
