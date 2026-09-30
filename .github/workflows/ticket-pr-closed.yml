@@ -1,0 +1,40 @@
+name: Ticket PR closed
+
+# Khi admin Merge (hoặc đóng) Pull Request của nhánh ticket/FB-xxx → cập nhật ticket trên /roadmap.
+# Workflow này chỉ ghi trạng thái; việc gộp code do admin tự bấm Merge trên GitHub.
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  update-ticket:
+    # chỉ nhánh ticket/* của chính repo này (không nhận PR từ fork)
+    if: startsWith(github.head_ref, 'ticket/FB-') && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      HEAD_REF: ${{ github.head_ref }}
+      MERGED: ${{ github.event.pull_request.merged }}
+      MERGE_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+      SUPABASE_URL: https://lrqktutmnwdgxmlcevud.supabase.co
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Update ticket
+        run: |
+          CODE="${HEAD_REF#ticket/}"
+          [[ "$CODE" =~ ^FB-[0-9]{3,}$ ]] || { echo "Mã ticket không hợp lệ"; exit 1; }
+          if [ "$MERGED" = "true" ]; then
+            node scripts/tickets.mjs done "$CODE" --sha "$MERGE_SHA" --url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/commit/$MERGE_SHA"
+          else
+            node scripts/tickets.mjs build "$CODE" --state rejected --note "Pull Request đã đóng mà không gộp."
+          fi

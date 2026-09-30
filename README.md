@@ -41,3 +41,16 @@ Mở khoá IP đang bị khoá do nhập sai: `delete from private.pin_attempts 
 npx serve .
 ```
 Mở `http://localhost:3000/` và `http://localhost:3000/roadmap.html` (trên Vercel là `/roadmap`).
+
+## Build by Claude (nút trên /roadmap)
+Chạy thêm `supabase/migrations/002_build_by_claude.sql`, rồi cấu hình 3 khoá (chỉ làm một lần):
+
+| Khoá | Đặt ở đâu | Lấy từ đâu |
+|---|---|---|
+| `CLAUDE_CODE_OAUTH_TOKEN` | GitHub → repo → Settings → Secrets and variables → Actions | Chạy `claude setup-token` trong terminal (gói Claude Pro/Max) |
+| `SUPABASE_SERVICE_ROLE_KEY` | GitHub → repo → Settings → Secrets and variables → Actions | Supabase → Settings → API Keys → Secret keys |
+| `github_dispatch_token` | Supabase → Integrations → Vault → Add new secret | GitHub → Settings → Developer settings → Fine-grained tokens: chỉ repo này, quyền **Actions: Read and write** |
+
+Nên bật thêm: GitHub → repo → Settings → Actions → General → **Allow GitHub Actions to create and approve pull requests** (để Claude tự mở Pull Request; nếu không bật, link "Duyệt trên GitHub" sẽ dẫn tới trang tạo Pull Request).
+
+Quy trình: mở ticket (chế độ admin) → **Build by Claude** → chờ vài phút → **Xem bản xem trước** → **Duyệt trên GitHub** → *Merge pull request* → Vercel deploy, ticket tự chuyển Done.

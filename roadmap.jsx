@@ -103,6 +103,7 @@
             <div className="rm-card-b">
               <span className="rm-code">{t.code}</span>
               <p className="rm-clamp">{t.description}</p>
+              {(isBuilding(t) || t.build_status === 'preview') && <span className="rm-badge" style={{ alignSelf: 'flex-start', background: BUILD[t.build_status][1], color: BUILD[t.build_status][2] }}>{t.build_status === 'preview' ? 'Claude xong — chờ duyệt' : 'Claude đang làm…'}</span>}
               <div className="rm-meta"><span>{t.reporter_name}</span><span title={F.fmtFull(t.created_at)}>{F.relTime(t.created_at)}</span></div>
             </div>
           </div>)}
@@ -237,13 +238,63 @@
     </form>;
   }
 
+  // ---------------------------------------------------------------- Build by Claude
+  const BUILD = {
+    queued: ['Đã gửi yêu cầu, đang chờ Claude bắt đầu…', 'var(--accent-100)', 'var(--accent-600)'],
+    running: ['Claude đang phân tích và sửa…', 'var(--accent-100)', 'var(--accent-600)'],
+    preview: ['Claude đã sửa xong — chờ duyệt', 'var(--brand-50)', 'var(--brand-700)'],
+    merging: ['Đang đưa lên bản chính thức…', 'var(--accent-100)', 'var(--accent-600)'],
+    failed: ['Claude chưa sửa được', 'var(--danger-bg)', 'var(--danger)'],
+    rejected: ['Bản xem trước đã bị từ chối', 'var(--surface-sunken)', 'var(--ink-muted)'],
+    merged: ['Đã đưa lên bản chính thức', 'var(--success-bg)', 'var(--success)'],
+  };
+  const BUILD_STALE = 20 * 60 * 1000; // quá 20 phút không cập nhật → coi như treo, cho bấm lại
+  const isBuilding = t => ['queued', 'running', 'merging'].includes(t.build_status) && Date.now() - new Date(t.build_updated_at || 0).getTime() < BUILD_STALE;
+
+  function BuildBox({ ticket, isAdmin, askAdmin, onBuild }) {
+    const [note, setNote] = React.useState('');
+    const [busy, setBusy] = React.useState(false);
+    const [err, setErr] = React.useState(null);
+    const bs = ticket.build_status, meta = BUILD[bs];
+    const building = isBuilding(ticket);
+    const canBuild = ['backlog', 'doing'].includes(ticket.status) && !building;
+    if (!bs && !(canBuild && isAdmin)) return null; // khách chỉ thấy khi đã có tiến độ build
+    async function go() {
+      if (!F.admin.pin() && !(await askAdmin())) return;
+      setBusy(true); setErr(null);
+      const r = await onBuild(ticket, note.trim());
+      setBusy(false);
+      if (r && r.ok) setNote(''); else setErr(r ? r.message : 'Có lỗi xảy ra.');
+    }
+    return <div className="rm-box">
+      <h3>Build by Claude</h3>
+      {meta && <p className="fb-alert" style={{ background: meta[1], color: meta[2], margin: 0, display: 'flex', gap: 8, alignItems: 'center' }}>
+        {building && <span className="fb-spin" aria-hidden="true" style={{ borderColor: 'rgba(0,0,0,.15)', borderTopColor: 'currentColor' }}></span>}
+        <b>{meta[0]}</b>
+      </p>}
+      {ticket.build_note && bs !== 'merged' && <p className="rm-tl-n" style={{ margin: 0 }}>{ticket.build_note}</p>}
+      {bs === 'preview' && <div className="rm-actions">
+        {ticket.preview_url && <Button size="sm" onClick={() => window.open(ticket.preview_url, '_blank', 'noopener')}>Xem bản xem trước</Button>}
+        {ticket.diff_url && <Button size="sm" variant="secondary" onClick={() => window.open(ticket.diff_url, '_blank', 'noopener')}>Duyệt trên GitHub</Button>}
+      </div>}
+      {bs === 'preview' && <p className="rm-muted" style={{ margin: 0, fontSize: 13 }}>Xem bản xem trước, nếu ổn thì mở GitHub và bấm <b>Merge pull request</b> — trang chính thức sẽ tự cập nhật và ticket chuyển Done.</p>}
+      {canBuild && isAdmin && <>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}><span className="rm-lbl">Chỉ dẫn thêm cho Claude (không bắt buộc)</span>
+          <textarea className="rm-textarea" value={note} maxLength={1000} onChange={e => setNote(e.target.value)} placeholder="Ví dụ: chỉ sửa trên mobile, giữ nguyên desktop." />
+        </label>
+        {err && <p className="rm-err" role="alert">{err}</p>}
+        <div><Button size="sm" variant="accent" disabled={busy} onClick={go}>{busy ? 'Đang gửi…' : bs ? 'Build lại bằng Claude' : 'Build by Claude'}</Button></div>
+      </>}
+    </div>;
+  }
+
   function Lightbox({ src, onClose }) {
     useEscTop(onClose);
     return <div className="rm-light" role="dialog" aria-modal="true" aria-label="Ảnh phóng to" onClick={onClose}><img src={src} alt="Ảnh chụp màn hình" /></div>;
   }
 
   // ---------------------------------------------------------------- Chi tiết
-  function Drawer({ code, ticket, loaded, isAdmin, version, onClose, askAdmin, onApply }) {
+  function Drawer({ code, ticket, loaded, isAdmin, version, onClose, askAdmin, onApply, onBuild }) {
     const [events, setEvents] = React.useState(null);
     const [contact, setContact] = React.useState(undefined);
     const [which, setWhich] = React.useState('annotated');
@@ -310,6 +361,7 @@
               <dt>Màn hình</dt><dd>{ticket.viewport || '—'}</dd>
               <dt>Trình duyệt</dt><dd title={ticket.user_agent}>{F.browserName(ticket.user_agent) || '—'}</dd>
             </dl>
+            <BuildBox key={'b' + version} ticket={ticket} isAdmin={isAdmin} askAdmin={askAdmin} onBuild={onBuild} />
             <div className="rm-box">
               <h3>Đổi trạng thái</h3>
               {isAdmin
@@ -398,6 +450,30 @@
         return { ok: false, message: F.errText(r) };
       } catch (e) { return { ok: false, message: F.errText(e) }; }
     }
+    async function requestBuild(t, note) {
+      const pin = F.admin.pin();
+      if (!pin) return { ok: false, message: 'Phiên admin đã hết. Vui lòng nhập lại PIN.' };
+      try {
+        const r = await api.requestBuild(t.code, pin, note);
+        if (r && r.ok) {
+          const now = new Date().toISOString();
+          setTickets(list => list.map(x => (x.code === t.code ? { ...x, status: 'doing', build_status: 'queued', build_note: null, preview_url: null, diff_url: null, build_updated_at: now } : x)));
+          setVersion(v => v + 1);
+          setFlash(`${t.code} — đã gửi cho Claude`);
+          return { ok: true };
+        }
+        if (r && (r.error === 'bad_pin' || r.error === 'locked')) F.admin.clear();
+        return { ok: false, message: F.errText(r) };
+      } catch (e) { return { ok: false, message: F.errText(e) }; }
+    }
+    // đang có ticket Claude xử lý → tự tải lại mỗi 15 giây
+    const anyBuilding = tickets.some(isBuilding);
+    React.useEffect(() => {
+      if (!anyBuilding) return;
+      const t = setInterval(() => { if (!document.hidden) load().then(() => setVersion(v => v + 1)); }, 15000);
+      return () => clearInterval(t);
+    }, [anyBuilding, load]);
+
     async function requestMove(t, to) {
       if (!F.admin.pin() && !(await askAdmin())) return; // huỷ PIN → thẻ giữ nguyên chỗ cũ
       setChange({ ticket: t, to });
@@ -483,7 +559,7 @@
           : <Board items={base} onOpen={openTicket} onMove={requestMove} canDrag={canDrag} />}
 
       {st.ticket && <Drawer key={st.ticket} code={st.ticket.toUpperCase()} ticket={current} loaded={loaded} isAdmin={isAdmin} version={version}
-        onClose={closeTicket} askAdmin={askAdmin} onApply={applyStatus} />}
+        onClose={closeTicket} askAdmin={askAdmin} onApply={applyStatus} onBuild={requestBuild} />}
       {change && <Modal title="Đổi trạng thái" onClose={() => setChange(null)}>
         <StatusForm ticket={change.ticket} initialTo={change.to} onApply={applyStatus} onCancel={() => setChange(null)} />
       </Modal>}

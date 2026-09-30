@@ -37,6 +37,9 @@
     unchanged: 'Ticket đã ở trạng thái này.',
     not_found: 'Không tìm thấy ticket.',
     invalid_status: 'Trạng thái không hợp lệ.',
+    invalid_state: 'Chỉ build được ticket đang ở Backlog hoặc Doing.',
+    already_building: 'Claude đang xử lý ticket này rồi. Vui lòng chờ.',
+    build_not_configured: 'Chưa cấu hình khoá GitHub trong Supabase Vault (github_dispatch_token).',
   };
   function errText(e) {
     if (!e) return 'Có lỗi xảy ra.';
@@ -122,6 +125,7 @@
     verifyPin: pin => rpc('verify_admin_pin', { p_pin: pin }),
     setStatus: (code, status, pin, note) => rpc('set_ticket_status', { p_code: code, p_status: status, p_pin: pin, p_note: note || null }),
     getPrivate: (code, pin) => rpc('get_ticket_private', { p_code: code, p_pin: pin }),
+    requestBuild: (code, pin, note) => rpc('request_build', { p_code: code, p_pin: pin, p_note: note || null }),
   };
 
   // Vercel phục vụ /roadmap (cleanUrls); server tĩnh khi chạy local thì cần roadmap.html

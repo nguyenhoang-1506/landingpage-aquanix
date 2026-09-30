@@ -1,0 +1,145 @@
+name: Build ticket with Claude
+
+# Kích hoạt bởi nút "Build by Claude" trên /roadmap (Supabase RPC request_build → workflow_dispatch).
+# Claude sửa code → đẩy nhánh ticket/FB-xxx → mở Pull Request → Vercel tạo bản xem trước → ghi link vào ticket.
+# Workflow này KHÔNG gộp vào main: admin tự xem và bấm Merge trên Pull Request.
+on:
+  workflow_dispatch:
+    inputs:
+      code:
+        description: 'Mã ticket (vd FB-012)'
+        required: true
+      note:
+        description: 'Chỉ dẫn thêm của admin (không bắt buộc)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+  pull-requests: write
+  deployments: read
+
+concurrency:
+  group: ticket-${{ inputs.code }}
+  cancel-in-progress: true
+
+env:
+  CODE: ${{ inputs.code }}
+  SUPABASE_URL: https://lrqktutmnwdgxmlcevud.supabase.co
+  RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Validate ticket code
+        run: '[[ "$CODE" =~ ^FB-[0-9]{3,}$ ]] || { echo "Mã ticket không hợp lệ"; exit 1; }'
+
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Load ticket + mark running
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ADMIN_NOTE: ${{ inputs.note }}
+        run: |
+          node scripts/tickets.mjs show "$CODE" --no-contact > /dev/null
+          node scripts/tickets.mjs build "$CODE" --state running --note "Claude đang phân tích và sửa…"
+          if [ -n "$ADMIN_NOTE" ]; then printf '%s\n' "$ADMIN_NOTE" > ".tickets/$CODE/admin-note.txt"; fi
+          git checkout -B "ticket/$CODE"
+
+      # Bước này KHÔNG có service key / GitHub token trong env, và Claude chỉ có công cụ đọc/sửa file
+      # (không Bash, không mạng) — vì nội dung ticket là dữ liệu do người lạ gửi.
+      - name: Run Claude Code
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          npm install -g @anthropic-ai/claude-code >/dev/null 2>&1
+          claude -p "Mã ticket: $CODE. Thư mục đầu vào: .tickets/$CODE/
+
+          $(cat .github/ticket-prompt.md)" \
+            --allowedTools "Read,Edit,Write,Glob,Grep" \
+            --permission-mode acceptEdits \
+            --max-turns 60
+
+      - name: Commit to preview branch
+        id: commit
+        run: |
+          # hoàn tác mọi thay đổi ở vùng cấm
+          git checkout -- .github scripts supabase .claude CLAUDE.md config.js vercel.json
+          git clean -fdq .github scripts supabase .claude
+          git add -A
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          TITLE=$(jq -r '.title' ".tickets/$CODE/ticket.json")
+          git -c user.name="claude-code[bot]" -c user.email="noreply@anthropic.com" commit -q -m "$CODE: $TITLE"
+          git push -f origin "ticket/$CODE"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      # Mở (hoặc dùng lại) Pull Request. Nếu repo chưa bật "Allow GitHub Actions to create pull requests"
+      # thì dùng link so sánh — admin bấm "Create pull request" ở đó.
+      - name: Open pull request
+        id: pr
+        if: steps.commit.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          URL=$(gh pr list --head "ticket/$CODE" --base main --state open --json url --jq '.[0].url // empty')
+          if [ -z "$URL" ]; then
+            BODY=".tickets/$CODE/summary.md"
+            [ -f "$BODY" ] || echo "Sửa theo góp ý $CODE." > "$BODY"
+            printf '\n\nTicket: https://landingpage-aquanix.vercel.app/roadmap?ticket=%s\n' "$CODE" >> "$BODY"
+            URL=$(gh pr create --head "ticket/$CODE" --base main --title "$(git log -1 --format=%s)" --body-file "$BODY" 2>/dev/null || true)
+          fi
+          [ -n "$URL" ] || URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/main...ticket/$CODE?expand=1"
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for Vercel preview
+        id: preview
+        if: steps.commit.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ steps.commit.outputs.sha }}
+        run: |
+          URL=""
+          for i in $(seq 1 45); do
+            for id in $(gh api "repos/$GITHUB_REPOSITORY/deployments?sha=$SHA&per_page=20" --jq '.[] | select(.environment | startswith("Preview")) | .id'); do
+              U=$(gh api "repos/$GITHUB_REPOSITORY/deployments/$id/statuses" --jq '[.[] | select(.state == "success")][0].environment_url // empty')
+              if [ -n "$U" ]; then URL="$U"; break; fi
+            done
+            [ -n "$URL" ] && break
+            sleep 8
+          done
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+
+      - name: Report result
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          CHANGED: ${{ steps.commit.outputs.changed }}
+          PREVIEW_URL: ${{ steps.preview.outputs.url }}
+          PR_URL: ${{ steps.pr.outputs.url }}
+        run: |
+          SUMMARY=".tickets/$CODE/summary.md"
+          if [ "$CHANGED" = "true" ]; then
+            ARGS=(--state preview --diff "$PR_URL")
+            [ -n "$PREVIEW_URL" ] && ARGS+=(--preview "$PREVIEW_URL")
+            node scripts/tickets.mjs build "$CODE" "${ARGS[@]}" --note "Claude đã sửa xong, chờ duyệt." --note-file "$SUMMARY"
+          else
+            node scripts/tickets.mjs build "$CODE" --state failed --note "Claude không sửa code cho góp ý này." --note-file "$SUMMARY"
+          fi
+
+      - name: Report failure
+        if: failure() || cancelled()
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/tickets.mjs build "$CODE" --state failed --note "Build lỗi hoặc bị huỷ. Xem log: $RUN_URL" || true

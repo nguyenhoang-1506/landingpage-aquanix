@@ -103,6 +103,7 @@ async function show(env, args) {
     if (saved) images[kind] = relative(ROOT, saved).replace(/\\/g, '/');
   }
   delete t.search_text;
+  if (args['no-contact']) delete t.reporter_contact; // CI: không đưa liên hệ người gửi cho Claude
   const out = { ...t, events, local_images: images };
   writeFileSync(join(dir, 'ticket.json'), JSON.stringify(out, null, 2));
   console.log(JSON.stringify(out, null, 2));
@@ -122,9 +123,24 @@ async function done(env, args) {
   console.log(`✔ ${code} → Done (commit ${sha.slice(0, 7)})`);
 }
 
+// Dùng trong GitHub Actions: cập nhật tiến độ "Build by Claude"
+async function build(env, args) {
+  const code = normCode(args._[1]);
+  const str = k => (args[k] && args[k] !== true ? String(args[k]) : null);
+  let note = str('note');
+  const noteFile = str('note-file');
+  if (noteFile && existsSync(noteFile)) note = readFileSync(noteFile, 'utf8').trim().slice(0, 2000) || note;
+  const res = await api(env, '/rest/v1/rpc/set_ticket_build', {
+    method: 'POST',
+    body: JSON.stringify({ p_code: code, p_state: str('state'), p_preview_url: str('preview'), p_diff_url: str('diff'), p_note: note }),
+  });
+  if (!res || !res.ok) fail('Không cập nhật được build: ' + JSON.stringify(res));
+  console.log(`✔ ${code} build → ${res.build_status}`);
+}
+
 const args = parseArgs(process.argv.slice(2));
 const cmd = args._[0];
-const cmds = { list, show, done };
+const cmds = { list, show, done, build };
 if (!cmds[cmd]) {
   console.log('Cách dùng:\n  node scripts/tickets.mjs list [--status backlog,doing]\n  node scripts/tickets.mjs show FB-012\n  node scripts/tickets.mjs done FB-012 --sha <sha> --url <commit_url> [--note "..."]');
   process.exit(cmd ? 1 : 0);
