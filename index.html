@@ -1,5 +1,5 @@
 <!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Aquanix — Nhật ký thủy sản điện tử</title>
-<link rel="preload" as="image" href="./assets/photos/opt/aerial-dawn.jpg" fetchpriority="high"><link rel="stylesheet" href="./styles.css">
+<link rel="preload" as="image" href="./assets/photos/opt/aerial-dawn.jpg" fetchpriority="high"><link rel="stylesheet" href="./styles.css"><link rel="stylesheet" href="./feedback.css">
 <style>
 body{background:var(--surface)}h1,h2,h3{color:var(--ink)}
 .wrap{max-width:1120px;margin:0 auto;padding:0 var(--space-5);box-sizing:border-box}
@@ -10,7 +10,7 @@ body{background:var(--surface)}h1,h2,h3{color:var(--ink)}
 .shot{opacity:0;transition:opacity 1.6s ease;transform:scale(1.18);transform-origin:50% 60%}.shot.on{opacity:1;animation:kb 7s ease-out forwards}
 @keyframes kb{from{transform:scale(1.18) translateY(-3%)}to{transform:scale(1) translateY(0)}}
 @media(prefers-reduced-motion:reduce){.shot.on{animation:none}}
-@media(max-width:1000px){.nav{display:none!important}.dot-label{display:none}}
+@media(max-width:1100px){.nav{display:none!important}}@media(max-width:1000px){.dot-label{display:none}}
 html{scroll-behavior:smooth}
 @media(max-width:760px){.g2,.g3{grid-template-columns:1fr}.feat.rev>*:first-child{order:0}.sec{padding-top:var(--space-7);padding-bottom:var(--space-7)}.hero-h1{font-size:36px;line-height:42px}.dots{display:none!important}}
 @media (max-width: 860px){.hero-grid{grid-template-columns:minmax(0,1fr) !important}}
@@ -44,7 +44,7 @@ html{scroll-behavior:smooth}
 
 html,body{overflow-x:clip;max-width:100%}
 img{max-width:100%}
-@media(max-width:1000px){.menu-btn{display:inline-flex!important}}
+@media(max-width:1100px){.menu-btn{display:inline-flex!important}}
 @media(min-width:761px) and (max-width:1000px){.hero-h1{font-size:46px;line-height:52px}.g3{grid-template-columns:repeat(2,minmax(0,1fr))}.pp .pp-photo{height:380px!important}.solo-photo{height:380px!important}}
 @media(max-width:760px){
   .hdr{height:64px!important}
@@ -76,6 +76,9 @@ input::placeholder,textarea::placeholder{color:var(--ink-subtle);opacity:1}
 <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
 <script src="./_ds_bundle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js" crossorigin="anonymous"></script>
+<script src="./config.js"></script>
+<script src="./feedback-core.js"></script>
 </head><body><template id="__bundler_thumbnail"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><rect width="200" height="200" fill="#0198B3"/><text x="100" y="118" text-anchor="middle" font-family="Be Vietnam Pro, sans-serif" font-weight="700" font-size="44" fill="#fff">Aquanix</text></svg></template><div id="root"></div>
 <script type="text/babel" src="./header.jsx"></script>
 <script type="text/babel" src="./hero.jsx"></script>
@@ -84,6 +87,8 @@ input::placeholder,textarea::placeholder{color:var(--ink-subtle);opacity:1}
 function App(){
   const [sent, setSent] = React.useState(false);
   const goTo = id => () => { const el = document.getElementById(id); if (el) window.scrollTo({ top: el.offsetTop - 72, behavior: 'smooth' }); };
+  // đến từ trang khác với /#day… → nội dung render sau khi trình duyệt xử lý hash, nên tự cuộn lại
+  React.useEffect(() => { const id = decodeURIComponent(location.hash.slice(1)); if (id) setTimeout(() => { const el = document.getElementById(id); if (el) window.scrollTo({ top: el.offsetTop - 72 }); }, 50); }, []);
   return <>
     <Header onCta={goTo('download')}/>
     <main data-screen-label="Landing hộ nuôi"><Hero onCta={goTo('download')} onDay={goTo('day')}/><Day/><Sell/><Why/><Voice/><Faq/><Download sent={sent} onSend={() => setSent(true)}/></main>
@@ -91,4 +96,5 @@ function App(){
   </>;
 }
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
-</script></body></html>
+</script>
+<script type="text/babel" data-presets="react" src="./feedback.jsx"></script></body></html>
