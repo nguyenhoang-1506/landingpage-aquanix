@@ -142,4 +142,5 @@ jobs:
         if: failure() || cancelled()
         env:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-        run: node scripts/tickets.mjs build "$CODE" --state failed --note "Build lỗi hoặc bị huỷ. Xem log: $RUN_URL" || true
+        run: |
+          node scripts/tickets.mjs build "$CODE" --state failed --note "Build lỗi hoặc bị huỷ. Xem log: $RUN_URL" || true
