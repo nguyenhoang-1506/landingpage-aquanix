@@ -1,0 +1,79 @@
+name: Review ticket build
+
+# Nút "Duyệt & đưa lên" / "Từ chối" trên /roadmap (admin đã xem bản xem trước, xác nhận bằng PIN)
+# → Supabase RPC review_build → workflow_dispatch.
+# approve: gộp nhánh ticket/FB-xxx vào main (Vercel tự deploy) → ticket Done kèm commit.
+# reject : đóng Pull Request, xoá nhánh xem trước.
+on:
+  workflow_dispatch:
+    inputs:
+      code:
+        description: 'Mã ticket (vd FB-012)'
+        required: true
+      decision:
+        description: 'approve | reject'
+        required: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: ticket-${{ inputs.code }}
+  cancel-in-progress: false
+
+env:
+  CODE: ${{ inputs.code }}
+  DECISION: ${{ inputs.decision }}
+  SUPABASE_URL: https://lrqktutmnwdgxmlcevud.supabase.co
+  SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Validate inputs
+        run: |
+          [[ "$CODE" =~ ^FB-[0-9]{3,}$ ]] || { echo "Mã ticket không hợp lệ"; exit 1; }
+          [[ "$DECISION" == "approve" || "$DECISION" == "reject" ]] || { echo "decision không hợp lệ"; exit 1; }
+
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Approve — publish to main
+        if: inputs.decision == 'approve'
+        run: |
+          git fetch origin "ticket/$CODE"
+          MSG=$(git log -1 --format=%s "origin/ticket/$CODE")
+          if ! git merge --squash "origin/ticket/$CODE"; then
+            node scripts/tickets.mjs build "$CODE" --state failed --note "Chưa đưa lên được vì trang vừa có thay đổi khác chồng lên cùng chỗ. Bạn bấm **Build lại bằng Claude** để Claude làm lại trên bản mới nhất nhé."
+            exit 1
+          fi
+          git -c user.name="claude-code[bot]" -c user.email="noreply@anthropic.com" commit -q -m "$MSG" -m "Duyệt từ trang Phát triển sản phẩm (admin)."
+          git push origin main
+          SHA=$(git rev-parse HEAD)
+          node scripts/tickets.mjs done "$CODE" --sha "$SHA" --url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/commit/$SHA"
+          PR=$(gh pr list --head "ticket/$CODE" --state open --json number --jq '.[0].number // empty')
+          [ -n "$PR" ] && gh pr close "$PR" --comment "Đã duyệt và đưa lên từ trang Phát triển sản phẩm (commit $SHA)." || true
+          git push origin --delete "ticket/$CODE" || true
+
+      - name: Reject — close preview
+        if: inputs.decision == 'reject'
+        run: |
+          PR=$(gh pr list --head "ticket/$CODE" --state open --json number --jq '.[0].number // empty')
+          [ -n "$PR" ] && gh pr close "$PR" --comment "Admin đã từ chối bản xem trước." || true
+          git push origin --delete "ticket/$CODE" || true
+          node scripts/tickets.mjs build "$CODE" --state rejected --note "Admin đã từ chối bản xem trước."
+
+      - name: Report failure
+        if: failure() || cancelled()
+        run: |
+          node scripts/tickets.mjs build "$CODE" --state failed --note "Bước đưa lên gặp lỗi kỹ thuật, trang chính thức chưa thay đổi. Bạn thử bấm lại, hoặc mở nhật ký để xem chi tiết." || true

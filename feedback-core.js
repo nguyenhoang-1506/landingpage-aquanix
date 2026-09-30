@@ -27,6 +27,10 @@
     not_configured: 'Chưa cấu hình máy chủ góp ý (config.js).',
     invalid_description: 'Mô tả cần 10–2000 ký tự.',
     invalid_title: 'Vấn đề gặp phải cần 5–150 ký tự.',
+    too_many_attachments: 'Tối đa 5 tệp đính kèm.',
+    cannot_delete_done: 'Góp ý đã Done nên không xoá được.',
+    cannot_edit: 'Chỉ sửa được góp ý đang ở Backlog hoặc Doing.',
+    no_preview: 'Chưa có bản xem trước để duyệt.',
     invalid_name: 'Tên cần 2–60 ký tự.',
     invalid_contact: 'SĐT/Email không đúng định dạng.',
     invalid_path: 'Đường dẫn ảnh không hợp lệ.',
@@ -109,6 +113,7 @@
         p_title: a.title || null, p_description: a.description, p_reporter_name: a.name || null, p_reporter_contact: a.contact || null,
         p_page_url: a.pageUrl, p_page_section: a.section || null, p_viewport: a.viewport, p_user_agent: a.userAgent,
         p_raw_path: a.rawPath || null, p_annotated_path: a.annotatedPath || null,
+        p_attachments: a.attachments && a.attachments.length ? a.attachments : null,
       });
     },
     async listTickets() {
@@ -127,6 +132,8 @@
     setStatus: (code, status, pin, note) => rpc('set_ticket_status', { p_code: code, p_status: status, p_pin: pin, p_note: note || null }),
     getPrivate: (code, pin) => rpc('get_ticket_private', { p_code: code, p_pin: pin }),
     deleteTicket: (code, pin) => rpc('delete_ticket', { p_code: code, p_pin: pin }),
+    updateTicket: (code, pin, title, description) => rpc('update_ticket', { p_code: code, p_pin: pin, p_title: title, p_description: description }),
+    reviewBuild: (code, pin, approve) => rpc('review_build', { p_code: code, p_pin: pin, p_approve: !!approve }),
     requestBuild: (code, pin, note) => rpc('request_build', { p_code: code, p_pin: pin, p_note: note || null }),
   };
 

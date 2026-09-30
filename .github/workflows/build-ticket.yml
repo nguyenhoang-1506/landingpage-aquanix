@@ -55,6 +55,25 @@ jobs:
           if [ -n "$ADMIN_NOTE" ]; then printf '%s\n' "$ADMIN_NOTE" > ".tickets/$CODE/admin-note.txt"; fi
           git checkout -B "ticket/$CODE"
 
+      # Chụp trang TRƯỚC khi sửa (chạy trang ngay trên máy build — bản xem trước Vercel cần đăng nhập nên không chụp được)
+      - name: Screenshots before
+        id: before
+        continue-on-error: true
+        run: |
+          mkdir -p "$RUNNER_TEMP/pw" "$RUNNER_TEMP/shots"
+          cp scripts/shot.mjs "$RUNNER_TEMP/pw/"
+          (cd "$RUNNER_TEMP/pw" && npm init -y >/dev/null && npm i playwright@1 >/dev/null 2>&1 && npx playwright install --with-deps chromium >/dev/null 2>&1)
+          PAGE=$(jq -r '.page_url // "/"' ".tickets/$CODE/ticket.json" | sed -E 's|^https?://[^/]+||; s|[?#].*$||')
+          [ -n "$PAGE" ] || PAGE=/
+          SECTION=$(jq -r '.page_section // "-"' ".tickets/$CODE/ticket.json")
+          echo "page=$PAGE" >> "$GITHUB_OUTPUT"
+          echo "section=$SECTION" >> "$GITHUB_OUTPUT"
+          npx --yes serve . -l 4173 >/dev/null 2>&1 &
+          SRV=$!
+          sleep 4
+          node "$RUNNER_TEMP/pw/shot.mjs" http://localhost:4173 "$PAGE" "$SECTION" "$RUNNER_TEMP/shots/before" || true
+          kill $SRV || true
+
       # Bước này KHÔNG có service key / GitHub token trong env, và Claude chỉ có công cụ đọc/sửa file
       # (không Bash, không mạng) — vì nội dung ticket là dữ liệu do người lạ gửi.
       - name: Run Claude Code
@@ -86,7 +105,7 @@ jobs:
           set -e
           echo "seconds=$(( $(date +%s) - START ))" >> "$GITHUB_OUTPUT"
           echo "::group::Nhật ký Claude (từng bước)"
-          node scripts/claude-log.mjs "$LOG"
+          node scripts/claude-log.mjs "$LOG" --json "$RUNNER_TEMP/steps.json"
           echo "::endgroup::"
           exit $RC
 
@@ -143,6 +162,36 @@ jobs:
           done
           echo "url=$URL" >> "$GITHUB_OUTPUT"
 
+      # Chụp trang SAU khi sửa, tải ảnh trước/sau lên kho ảnh, tạo bảng so sánh cho báo cáo
+      - name: Screenshots after
+        if: steps.commit.outputs.changed == 'true'
+        continue-on-error: true
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          PAGE: ${{ steps.before.outputs.page }}
+          SECTION: ${{ steps.before.outputs.section }}
+        run: |
+          : > "$RUNNER_TEMP/shots.md"
+          [ -f "$RUNNER_TEMP/pw/shot.mjs" ] || exit 0
+          npx --yes serve . -l 4173 >/dev/null 2>&1 &
+          SRV=$!
+          sleep 4
+          node "$RUNNER_TEMP/pw/shot.mjs" http://localhost:4173 "${PAGE:-/}" "${SECTION:--}" "$RUNNER_TEMP/shots/after" || true
+          kill $SRV || true
+          up() { [ -f "$RUNNER_TEMP/shots/$1.png" ] && node scripts/tickets.mjs upload "$RUNNER_TEMP/shots/$1.png" "builds/$CODE/$GITHUB_RUN_ID-$1.png" 2>/dev/null || true; }
+          BD=$(up before-desktop); AD=$(up after-desktop); BM=$(up before-mobile); AM=$(up after-mobile)
+          if [ -n "$AD$AM" ]; then
+            {
+              echo
+              echo "### Trước và sau khi sửa"
+              echo
+              echo "| | Trước | Sau |"
+              echo "|---|---|---|"
+              [ -n "$AD" ] && echo "| Máy tính | ${BD:+![Trước - máy tính]($BD)} | ![Sau - máy tính]($AD) |" || true
+              [ -n "$AM" ] && echo "| Điện thoại | ${BM:+![Trước - điện thoại]($BM)} | ![Sau - điện thoại]($AM) |" || true
+            } > "$RUNNER_TEMP/shots.md"
+          fi
+
       - name: Report result
         env:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -151,13 +200,16 @@ jobs:
           PR_URL: ${{ steps.pr.outputs.url }}
           SECS: ${{ steps.claude.outputs.seconds }}
         run: |
-          SUMMARY=".tickets/$CODE/summary.md"
+          REPORT="$RUNNER_TEMP/report.md"
+          cat ".tickets/$CODE/summary.md" 2>/dev/null > "$REPORT" || true
+          [ -f "$RUNNER_TEMP/shots.md" ] && cat "$RUNNER_TEMP/shots.md" >> "$REPORT"
+          STEPS=(--steps-file "$RUNNER_TEMP/steps.json")
           if [ "$CHANGED" = "true" ]; then
             ARGS=(--state preview --diff "$PR_URL" --seconds "$SECS")
             [ -n "$PREVIEW_URL" ] && ARGS+=(--preview "$PREVIEW_URL")
-            node scripts/tickets.mjs build "$CODE" "${ARGS[@]}" --note "Claude đã sửa xong, chờ duyệt." --note-file "$SUMMARY"
+            node scripts/tickets.mjs build "$CODE" "${ARGS[@]}" "${STEPS[@]}" --note "Claude đã sửa xong, chờ duyệt." --note-file "$REPORT"
           else
-            node scripts/tickets.mjs build "$CODE" --state failed --seconds "$SECS" --note "Claude chưa sửa gì cho góp ý này." --note-file "$SUMMARY"
+            node scripts/tickets.mjs build "$CODE" --state failed --seconds "$SECS" "${STEPS[@]}" --note "Claude chưa sửa gì cho góp ý này." --note-file "$REPORT"
           fi
 
       - name: Report failure
@@ -166,4 +218,4 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           SECS: ${{ steps.claude.outputs.seconds }}
         run: |
-          node scripts/tickets.mjs build "$CODE" --state failed --seconds "$SECS" --note "Lần chạy này gặp lỗi kỹ thuật. Bạn có thể bấm Build lại, hoặc mở nhật ký để xem chi tiết." || true
+          node scripts/tickets.mjs build "$CODE" --state failed --seconds "$SECS" --steps-file "$RUNNER_TEMP/steps.json" --note "Lần chạy này gặp lỗi kỹ thuật. Bạn có thể bấm Build lại, hoặc mở nhật ký để xem chi tiết." || true

@@ -243,23 +243,45 @@
     queued: ['Đã gửi yêu cầu, đang chờ Claude bắt đầu…', 'var(--accent-100)', 'var(--accent-600)'],
     running: ['Claude đang phân tích và sửa…', 'var(--accent-100)', 'var(--accent-600)'],
     preview: ['Claude đã sửa xong — chờ duyệt', 'var(--brand-50)', 'var(--brand-700)'],
-    merging: ['Đang đưa lên bản chính thức…', 'var(--accent-100)', 'var(--accent-600)'],
+    merging: ['Đang đưa lên trang chính thức… (khoảng 1 phút)', 'var(--accent-100)', 'var(--accent-600)'],
     failed: ['Claude chưa sửa — xem lời nhắn bên dưới', 'var(--warning-bg)', 'var(--warning)'],
     rejected: ['Bản xem trước đã bị từ chối', 'var(--surface-sunken)', 'var(--ink-muted)'],
-    merged: ['Đã đưa lên bản chính thức', 'var(--success-bg)', 'var(--success)'],
+    merged: ['Đã đưa lên trang chính thức', '#E6F4EC', '#2E7D5B'],
   };
   const BUILD_STALE = 20 * 60 * 1000; // quá 20 phút không cập nhật → coi như treo, cho bấm lại
   const isBuilding = t => ['queued', 'running', 'merging'].includes(t.build_status) && Date.now() - new Date(t.build_updated_at || 0).getTime() < BUILD_STALE;
 
-  // Lời nhắn của Claude → chữ thuần, bỏ ký hiệu định dạng (**, #, `) cho dễ đọc
-  const plain = t => String(t || '')
-    .replace(/\r/g, '')
-    .replace(/^\s{0,3}#{1,6}\s*/gm, '')
-    .replace(/\*\*|__|`/g, '')
-    .replace(/^\s*[*•]\s+/gm, '- ')
-    .replace(/^\s*[-–—]{3,}\s*$/gm, '')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
+  // Báo cáo của Claude là Markdown (tiêu đề, chữ đậm, danh sách, bảng, ảnh trước/sau) → HTML đã lọc an toàn.
+  // Nội dung có thể bị ảnh hưởng bởi góp ý của người lạ nên luôn qua DOMPurify.
+  function mdToHtml(text) {
+    const src = String(text || '');
+    if (!window.marked || !window.DOMPurify) return null;
+    const html = window.marked.parse(src, { gfm: true, breaks: true });
+    return window.DOMPurify.sanitize(html, { ADD_ATTR: ['target'], FORBID_TAGS: ['style', 'form', 'input', 'iframe'] });
+  }
+  function Md({ text, onImage }) {
+    const html = React.useMemo(() => mdToHtml(text), [text]);
+    const ref = React.useRef(null);
+    React.useEffect(() => {
+      const el = ref.current; if (!el) return;
+      el.querySelectorAll('a[href]').forEach(a => { a.target = '_blank'; a.rel = 'noopener noreferrer'; });
+      el.querySelectorAll('img').forEach(img => { img.loading = 'lazy'; });
+      el.querySelectorAll('table').forEach(t => { if (!t.parentElement.classList.contains('rm-md-table')) { const w = document.createElement('div'); w.className = 'rm-md-table'; t.replaceWith(w); w.appendChild(t); } });
+    }, [html]);
+    if (html == null) return <p className="rm-md" style={{ whiteSpace: 'pre-wrap' }}>{text}</p>;
+    return <div ref={ref} className="rm-md" dangerouslySetInnerHTML={{ __html: html }}
+      onClick={e => { if (e.target.tagName === 'IMG' && onImage) { e.preventDefault(); onImage(e.target.src); } }} />;
+  }
+  // Các bước Claude đã làm (thu gọn, bấm để xem)
+  const STEP_ICON = { think: '💭', read: '📖', look: '👀', search: '🔎', edit: '✏️', write: '📝', other: '•' };
+  function BuildSteps({ steps }) {
+    if (!Array.isArray(steps) || !steps.length) return null;
+    const n = steps.filter(s => s.k !== 'think').length;
+    return <details className="rm-steps">
+      <summary>Các bước Claude đã làm <span className="rm-muted">({n} thao tác)</span></summary>
+      <ol>{steps.map((s, i) => <li key={i} className={'k-' + s.k}><span aria-hidden="true">{STEP_ICON[s.k] || '•'}</span><span>{s.t}</span></li>)}</ol>
+    </details>;
+  }
   const fmtDur = sec => { sec = Math.max(0, Math.round(sec)); const m = Math.floor(sec / 60), r = sec % 60; return m ? `${m} phút ${String(r).padStart(2, '0')} giây` : `${r} giây`; };
 
   // Số phút giây Claude đã suy nghĩ: đang chạy thì đếm trực tiếp, xong thì hiện tổng
@@ -273,10 +295,18 @@
     return null;
   }
 
-  function BuildBox({ ticket, isAdmin, askAdmin, onBuild }) {
+  function BuildBox({ ticket, isAdmin, askAdmin, onBuild, onReview, onImage }) {
     const [note, setNote] = React.useState('');
     const [busy, setBusy] = React.useState(false);
     const [err, setErr] = React.useState(null);
+    async function review(approve) {
+      if (!F.admin.pin() && !(await askAdmin())) return;
+      if (!window.confirm(approve ? 'Đưa thay đổi này lên trang chính thức? Khách sẽ thấy ngay sau khoảng 1 phút.' : 'Từ chối bản xem trước này? Thay đổi của Claude sẽ bị bỏ.')) return;
+      setBusy(true); setErr(null);
+      const r = await onReview(ticket, approve);
+      setBusy(false);
+      if (!r || !r.ok) setErr(r ? r.message : 'Có lỗi xảy ra.');
+    }
     const bs = ticket.build_status, meta = BUILD[bs];
     const building = isBuilding(ticket);
     const canBuild = ['backlog', 'doing'].includes(ticket.status) && !building;
@@ -298,13 +328,21 @@
         <BuildTimer ticket={ticket} building={building} />
         {ticket.build_log_url && <a className="rm-loglink" href={ticket.build_log_url} target="_blank" rel="noopener">Xem nhật ký</a>}
       </div>}
-      {ticket.build_note && !building && bs !== 'merged' && <div className="rm-claude-note"><span className="rm-lbl">Lời nhắn của Claude</span><p>{plain(ticket.build_note)}</p></div>}
-      {bs === 'preview' && <div className="rm-actions">
-        {ticket.preview_url && <Button size="sm" onClick={() => window.open(ticket.preview_url, '_blank', 'noopener')}>Xem bản xem trước</Button>}
-        {ticket.diff_url && <Button size="sm" variant="secondary" onClick={() => window.open(ticket.diff_url, '_blank', 'noopener')}>Duyệt trên GitHub</Button>}
+      {ticket.build_note && !building && <div className="rm-claude-note">
+        <div className="rm-claude-head"><span className="rm-claude-avatar" aria-hidden="true">✳</span><b>Claude</b></div>
+        <Md text={ticket.build_note} onImage={onImage} />
       </div>}
-      {bs === 'preview' && <p className="rm-muted" style={{ margin: 0, fontSize: 13 }}>Xem bản xem trước, nếu ổn thì mở GitHub và bấm <b>Merge pull request</b> — trang chính thức sẽ tự cập nhật và ticket chuyển Done.</p>}
-      {canBuild && isAdmin && <>
+      {!building && <BuildSteps steps={ticket.build_steps} />}
+      {bs === 'preview' && <div className="rm-review">
+        <div className="rm-review-links">
+          {ticket.preview_url && <a href={ticket.preview_url} target="_blank" rel="noopener">Mở bản xem trước ↗</a>}
+          {ticket.diff_url && <a href={ticket.diff_url} target="_blank" rel="noopener" className="rm-muted">Xem thay đổi trên GitHub ↗</a>}
+        </div>
+        {isAdmin ? <div className="rm-actions">
+          <Button size="sm" variant="secondary" disabled={busy} onClick={() => review(false)}>Từ chối</Button>
+          <Button size="sm" disabled={busy} onClick={() => review(true)}>{busy ? 'Đang gửi…' : 'Duyệt & đưa lên'}</Button>
+        </div> : <p className="rm-muted" style={{ margin: 0, fontSize: 13 }}>Đang chờ admin duyệt.</p>}
+      </div>}      {canBuild && isAdmin && <>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}><span className="rm-lbl">Chỉ dẫn thêm cho Claude (không bắt buộc)</span>
           <textarea className="rm-textarea" value={note} maxLength={1000} onChange={e => setNote(e.target.value)} placeholder="Ví dụ: chỉ sửa trên mobile, giữ nguyên desktop." />
         </label>
@@ -320,11 +358,51 @@
   }
 
   // ---------------------------------------------------------------- Chi tiết
-  function Drawer({ code, ticket, loaded, isAdmin, version, onClose, askAdmin, onApply, onBuild, onDelete }) {
+  // Tệp khách gửi kèm: ảnh hiện lưới (bấm để phóng to), tài liệu hiện dạng thẻ mở trong tab mới
+  function Attachments({ list, onImage }) {
+    if (!Array.isArray(list) || !list.length) return null;
+    const isImg = a => (a.type || '').startsWith('image/');
+    const imgs = list.filter(isImg), docs = list.filter(a => !isImg(a));
+    return <div className="rm-atts">
+      <span className="rm-lbl">Tệp đính kèm ({list.length})</span>
+      {imgs.length > 0 && <div className="rm-att-grid">{imgs.map(a => { const u = F.publicUrl(a.path); return <button key={a.path} type="button" onClick={() => onImage(u)} title={a.name}><img src={u} alt={a.name} loading="lazy" /></button>; })}</div>}
+      {docs.map(a => <a key={a.path} className="rm-att-doc" href={F.publicUrl(a.path)} target="_blank" rel="noopener">
+        <span aria-hidden="true">{(a.type || '').includes('pdf') ? 'PDF' : 'TXT'}</span>{a.name}
+      </a>)}
+    </div>;
+  }
+  // Admin sửa nội dung phiếu (Backlog / Doing)
+  function EditForm({ ticket, onSave, onCancel }) {
+    const [t, setT] = React.useState(ticket.title);
+    const [d, setD] = React.useState(ticket.description);
+    const [busy, setBusy] = React.useState(false);
+    const [err, setErr] = React.useState(null);
+    async function save(e) {
+      e.preventDefault();
+      if (t.trim().length < 5) return setErr('Vấn đề gặp phải cần ít nhất 5 ký tự.');
+      if (d.trim().length < 10) return setErr('Mô tả cần ít nhất 10 ký tự.');
+      setBusy(true); setErr(null);
+      const r = await onSave(t.trim(), d.trim());
+      setBusy(false);
+      if (!r || !r.ok) setErr(r ? r.message : 'Có lỗi xảy ra.');
+    }
+    return <form className="rm-box" onSubmit={save}>
+      <h3>Sửa nội dung phiếu</h3>
+      <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}><span className="rm-lbl">Vấn đề gặp phải</span>
+        <input className="rm-input" value={t} maxLength={150} onChange={e => setT(e.target.value)} autoFocus /></label>
+      <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}><span className="rm-lbl">Mô tả và gợi ý giải quyết</span>
+        <textarea className="rm-textarea" style={{ minHeight: 140 }} value={d} maxLength={2000} onChange={e => setD(e.target.value)} /></label>
+      {err && <p className="rm-err" role="alert">{err}</p>}
+      <div className="rm-actions"><Button variant="secondary" onClick={onCancel} disabled={busy}>Huỷ</Button><Button type="submit" disabled={busy}>{busy ? 'Đang lưu…' : 'Lưu'}</Button></div>
+    </form>;
+  }
+
+  function Drawer({ code, ticket, loaded, isAdmin, version, onClose, askAdmin, onApply, onBuild, onDelete, onReview, onEdit }) {
     const [events, setEvents] = React.useState(null);
     const [contact, setContact] = React.useState(undefined);
     const [which, setWhich] = React.useState('annotated');
-    const [zoom, setZoom] = React.useState(false);
+    const [zoom, setZoom] = React.useState(null); // src ảnh đang phóng to
+    const [editing, setEditing] = React.useState(false);
     const closeRef = React.useRef(null);
     const [delBusy, setDelBusy] = React.useState(false);
     const [delErr, setDelErr] = React.useState(null);
@@ -375,23 +453,28 @@
         <div className="rm-drawer-b">
           {!ticket ? <div className="rm-empty"><h3>{loaded ? 'Không tìm thấy ticket' : 'Đang tải…'}</h3>{loaded && <p>Mã {code} không tồn tại hoặc đã bị xoá.</p>}</div> : <>
             <div className="rm-detail"><div className="rm-detail-main">
-            <div>
-              <h2 className="rm-title">{ticket.title}</h2>
-              {ticket.description.trim() !== ticket.title.trim() && <p className="rm-desc">{ticket.description}</p>}
-            </div>
+            {editing ? <EditForm ticket={ticket} onCancel={() => setEditing(false)} onSave={async (t, d) => { const r = await onEdit(ticket, t, d); if (r && r.ok) setEditing(false); return r; }} />
+              : <div>
+                <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                  <h2 className="rm-title" style={{ flex: 1 }}>{ticket.title}</h2>
+                  {isAdmin && ['backlog', 'doing'].includes(ticket.status) && <button type="button" className="rm-link" style={{ flex: 'none' }} onClick={() => setEditing(true)}>Sửa nội dung</button>}
+                </div>
+                {ticket.description.trim() !== ticket.title.trim() && <p className="rm-desc">{ticket.description}</p>}
+              </div>}
             {img && <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
               {ann && raw && <div className="rm-seg" role="group" aria-label="Chọn ảnh" style={{ alignSelf: 'flex-start' }}>
                 <button type="button" aria-pressed={which === 'annotated'} onClick={() => setWhich('annotated')}>Ảnh đã vẽ</button>
                 <button type="button" aria-pressed={which === 'raw'} onClick={() => setWhich('raw')}>Ảnh gốc</button>
               </div>}
-              <img className="rm-shot" src={img} alt={'Ảnh chụp màn hình của ' + code} onClick={() => setZoom(true)} />
+              <img className="rm-shot" src={img} alt={'Ảnh chụp màn hình của ' + code} onClick={() => setZoom(img)} />
             </div>}
+            <Attachments list={ticket.attachments} onImage={setZoom} />
+            <BuildBox key={'b' + version} ticket={ticket} isAdmin={isAdmin} askAdmin={askAdmin} onBuild={onBuild} onReview={onReview} onImage={setZoom} />
             {ticket.status === 'done' && ticket.commit_url && <p className="fb-alert" style={{ background: 'var(--success-bg)', color: 'var(--success)', margin: 0 }}>
               Đã sửa trong commit <a href={ticket.commit_url} target="_blank" rel="noopener" style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{(ticket.commit_sha || '').slice(0, 7)}</a> trên GitHub.
             </p>}
             {ticket.status_note && <p className="fb-alert" style={{ background: 'var(--surface-sunken)', color: 'var(--ink)', margin: 0 }}><b>Ghi chú: </b>{ticket.status_note}</p>}
             </div><div className="rm-detail-side">
-            <BuildBox key={'b' + version} ticket={ticket} isAdmin={isAdmin} askAdmin={askAdmin} onBuild={onBuild} />
             <dl className="rm-dl">
               <dt>Người gửi</dt><dd>{ticket.reporter_name}</dd>
               {isAdmin && <><dt>SĐT / Email</dt><dd>{contact === undefined ? '…' : contact || <span className="rm-muted">Không để lại</span>}</dd></>}
@@ -417,7 +500,7 @@
                   {ev.note && <p className="rm-tl-n">{ev.note}</p>}
                 </li>)}</ol>}
             </div>
-            {isAdmin && <div>
+            {isAdmin && ticket.status !== 'done' && <div>
               <button type="button" className="rm-danger" onClick={del} disabled={delBusy}>{delBusy ? 'Đang xoá…' : 'Xoá góp ý này'}</button>
               {delErr && <p className="rm-err" role="alert" style={{ marginTop: 6 }}>{delErr}</p>}
             </div>}
@@ -425,7 +508,7 @@
           </>}
         </div>
       </aside>
-      {zoom && img && <Lightbox src={img} onClose={() => setZoom(false)} />}
+      {zoom && <Lightbox src={zoom} onClose={() => setZoom(null)} />}
     </>;
   }
 
@@ -488,6 +571,35 @@
           setVersion(v => v + 1); setChange(null);
           setFlash(`${t.code} → ${STATUS[to].label}`);
           load();
+          return { ok: true };
+        }
+        if (r && (r.error === 'bad_pin' || r.error === 'locked')) F.admin.clear();
+        return { ok: false, message: F.errText(r) };
+      } catch (e) { return { ok: false, message: F.errText(e) }; }
+    }
+    async function editTicket(t, title, description) {
+      const pin = F.admin.pin();
+      if (!pin) return { ok: false, message: 'Phiên admin đã hết. Vui lòng nhập lại PIN.' };
+      try {
+        const r = await api.updateTicket(t.code, pin, title, description);
+        if (r && r.ok) {
+          setTickets(list => list.map(x => (x.code === t.code ? { ...x, title, description, updated_at: new Date().toISOString() } : x)));
+          setVersion(v => v + 1); setFlash(`${t.code} — đã lưu nội dung`);
+          return { ok: true };
+        }
+        if (r && (r.error === 'bad_pin' || r.error === 'locked')) F.admin.clear();
+        return { ok: false, message: F.errText(r) };
+      } catch (e) { return { ok: false, message: F.errText(e) }; }
+    }
+    async function reviewBuild(t, approve) {
+      const pin = F.admin.pin();
+      if (!pin) return { ok: false, message: 'Phiên admin đã hết. Vui lòng nhập lại PIN.' };
+      try {
+        const r = await api.reviewBuild(t.code, pin, approve);
+        if (r && r.ok) {
+          setTickets(list => list.map(x => (x.code === t.code ? { ...x, build_status: r.build_status, build_updated_at: new Date().toISOString() } : x)));
+          setVersion(v => v + 1);
+          setFlash(approve ? `${t.code} — đang đưa lên trang chính thức` : `${t.code} — đã từ chối bản xem trước`);
           return { ok: true };
         }
         if (r && (r.error === 'bad_pin' || r.error === 'locked')) F.admin.clear();
@@ -618,7 +730,7 @@
           : <Board items={base} onOpen={openTicket} onMove={requestMove} canDrag={canDrag} />}
 
       {st.ticket && <Drawer key={st.ticket} code={st.ticket.toUpperCase()} ticket={current} loaded={loaded} isAdmin={isAdmin} version={version}
-        onClose={closeTicket} askAdmin={askAdmin} onApply={applyStatus} onBuild={requestBuild} onDelete={deleteTicket} />}
+        onClose={closeTicket} askAdmin={askAdmin} onApply={applyStatus} onBuild={requestBuild} onDelete={deleteTicket} onReview={reviewBuild} onEdit={editTicket} />}
       {change && <Modal title="Đổi trạng thái" onClose={() => setChange(null)}>
         <StatusForm ticket={change.ticket} initialTo={change.to} onApply={applyStatus} onCancel={() => setChange(null)} />
       </Modal>}

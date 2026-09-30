@@ -102,9 +102,20 @@ async function show(env, args) {
     const saved = await download(env, p, join(dir, kind + extname(p)));
     if (saved) images[kind] = relative(ROOT, saved).replace(/\\/g, '/');
   }
+  // tệp đính kèm khách gửi thêm → .tickets/<MÃ>/attachments/
+  const atts = [];
+  if (Array.isArray(t.attachments) && t.attachments.length) {
+    const adir = join(dir, 'attachments');
+    mkdirSync(adir, { recursive: true });
+    for (const [i, a] of t.attachments.entries()) {
+      const safe = String(a.name || 'tep').replace(/[^\p{L}\p{N}._-]+/gu, '_').slice(0, 80);
+      const saved = await download(env, a.path, join(adir, `${i + 1}-${safe}${extname(safe) ? '' : extname(a.path)}`));
+      if (saved) atts.push(relative(ROOT, saved).replace(/\\/g, '/'));
+    }
+  }
   delete t.search_text;
   if (args['no-contact']) delete t.reporter_contact; // CI: không đưa liên hệ người gửi cho Claude
-  const out = { ...t, events, local_images: images };
+  const out = { ...t, events, local_images: images, local_attachments: atts };
   writeFileSync(join(dir, 'ticket.json'), JSON.stringify(out, null, 2));
   console.log(JSON.stringify(out, null, 2));
   if (!Object.keys(images).length) console.error('(Ticket không có ảnh.)');
@@ -129,12 +140,15 @@ async function build(env, args) {
   const str = k => (args[k] && args[k] !== true ? String(args[k]) : null);
   let note = str('note');
   const noteFile = str('note-file');
-  if (noteFile && existsSync(noteFile)) note = readFileSync(noteFile, 'utf8').trim().slice(0, 2000) || note;
+  if (noteFile && existsSync(noteFile)) note = readFileSync(noteFile, 'utf8').trim().slice(0, 8000) || note;
+  let steps = null;
+  const stepsFile = str('steps-file');
+  if (stepsFile && existsSync(stepsFile)) { try { steps = JSON.parse(readFileSync(stepsFile, 'utf8')); } catch {} }
   const res = await api(env, '/rest/v1/rpc/set_ticket_build', {
     method: 'POST',
     body: JSON.stringify({
       p_code: code, p_state: str('state'), p_preview_url: str('preview'), p_diff_url: str('diff'), p_note: note,
-      p_log_url: str('log'), p_seconds: /^\d+$/.test(str('seconds') || '') ? Number(str('seconds')) : null,
+      p_log_url: str('log'), p_seconds: /^\d+$/.test(str('seconds') || '') ? Number(str('seconds')) : null, p_steps: steps,
     }),
   });
   if (!res || !res.ok) fail('Không cập nhật được build: ' + JSON.stringify(res));
@@ -143,7 +157,18 @@ async function build(env, args) {
 
 const args = parseArgs(process.argv.slice(2));
 const cmd = args._[0];
-const cmds = { list, show, done, build };
+// Dùng trong GitHub Actions: tải ảnh trước/sau lên kho ảnh, in ra link công khai
+async function upload(env, args) {
+  const [, local, remote] = args._;
+  if (!local || !existsSync(local) || !remote || !/^builds\/FB-\d+\/[\w.-]+\.png$/.test(remote)) fail('Cách dùng: upload <file.png> builds/FB-xxx/<tên>.png');
+  const headers = { apikey: env.key, 'Content-Type': 'image/png', 'x-upsert': 'true' };
+  if (env.key.startsWith('eyJ')) headers.Authorization = 'Bearer ' + env.key;
+  const res = await fetch(`${env.url}/storage/v1/object/${BUCKET}/${remote}`, { method: 'POST', headers, body: readFileSync(local) });
+  if (!res.ok) fail(`Upload lỗi ${res.status}: ${await res.text()}`);
+  console.log(`${env.url}/storage/v1/object/public/${BUCKET}/${remote}`);
+}
+
+const cmds = { list, show, done, build, upload };
 if (!cmds[cmd]) {
   console.log('Cách dùng:\n  node scripts/tickets.mjs list [--status backlog,doing]\n  node scripts/tickets.mjs show FB-012\n  node scripts/tickets.mjs done FB-012 --sha <sha> --url <commit_url> [--note "..."]');
   process.exit(cmd ? 1 : 0);

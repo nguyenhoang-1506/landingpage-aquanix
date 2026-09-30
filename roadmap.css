@@ -162,3 +162,52 @@
 .rm-danger{border:1.5px solid var(--danger-bg);background:transparent;color:var(--danger);font:600 14px/20px var(--font-sans);padding:9px 14px;border-radius:var(--radius-md);cursor:pointer;min-height:40px}
 .rm-danger:hover:not(:disabled){background:var(--danger-bg)}
 .rm-danger:disabled{opacity:.5;cursor:not-allowed}
+
+/* Trả lời của Claude — hiển thị Markdown như app Claude */
+.rm-claude-note{background:var(--surface);border:1px solid var(--border);box-shadow:var(--shadow-card);border-radius:var(--radius-lg);padding:16px 18px;gap:10px}
+.rm-claude-head{display:flex;align-items:center;gap:8px;font:var(--text-body-strong);color:var(--ink)}
+.rm-claude-avatar{width:26px;height:26px;border-radius:8px;background:#D97757;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:15px;line-height:1}
+.rm-md{font:var(--text-body);color:var(--ink);word-break:break-word}
+.rm-md>*:first-child{margin-top:0}.rm-md>*:last-child{margin-bottom:0}
+.rm-md p{margin:0 0 10px}
+.rm-md h1,.rm-md h2,.rm-md h3,.rm-md h4{margin:16px 0 8px;font:600 16px/24px var(--font-sans);color:var(--ink)}
+.rm-md h1,.rm-md h2{font-size:18px}
+.rm-md ul,.rm-md ol{margin:0 0 10px;padding-left:22px}
+.rm-md li{margin:3px 0}
+.rm-md strong{font-weight:700}
+.rm-md a{color:var(--brand-600);text-decoration:underline;text-underline-offset:3px}
+.rm-md code{font:var(--text-code);font-size:13px;background:var(--surface-sunken);padding:1px 5px;border-radius:5px}
+.rm-md pre{background:var(--surface-sunken);padding:10px 12px;border-radius:8px;overflow:auto}
+.rm-md pre code{background:none;padding:0}
+.rm-md blockquote{margin:0 0 10px;padding:6px 12px;border-left:3px solid var(--brand-100);color:var(--ink-muted)}
+.rm-md hr{border:0;border-top:1px solid var(--border);margin:14px 0}
+.rm-md img{max-width:100%;border-radius:8px;border:1px solid var(--border);cursor:zoom-in;display:block}
+.rm-md-table{overflow-x:auto;margin:0 0 12px;border:1px solid var(--border);border-radius:10px}
+.rm-md table{border-collapse:collapse;width:100%;font-size:14px}
+.rm-md th,.rm-md td{padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;vertical-align:top}
+.rm-md th{background:var(--surface-sunken);font-weight:600}
+.rm-md tr:last-child td{border-bottom:0}
+.rm-md td img{min-width:140px}
+
+/* Các bước Claude đã làm */
+.rm-steps{border:1px solid var(--border);border-radius:var(--radius-md);padding:8px 12px;background:var(--surface)}
+.rm-steps summary{cursor:pointer;font:600 14px/22px var(--font-sans);color:var(--ink)}
+.rm-steps ol{list-style:none;margin:8px 0 2px;padding:0;display:flex;flex-direction:column;gap:5px;max-height:320px;overflow:auto}
+.rm-steps li{display:flex;gap:8px;font:400 13px/19px var(--font-sans);color:var(--ink-muted)}
+.rm-steps li.k-think{color:var(--ink);font-style:italic}
+.rm-steps li.k-edit{color:var(--ink);font-weight:600}
+
+/* Duyệt bản xem trước */
+.rm-review{display:flex;flex-direction:column;gap:10px;border:1.5px solid var(--brand-100);background:var(--brand-50);border-radius:var(--radius-md);padding:12px 14px}
+.rm-review-links{display:flex;gap:16px;flex-wrap:wrap;font:600 14px/20px var(--font-sans)}
+.rm-review-links a{text-decoration:underline;text-underline-offset:3px}
+
+/* Tệp đính kèm */
+.rm-atts{display:flex;flex-direction:column;gap:8px}
+.rm-att-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px}
+.rm-att-grid button{border:1px solid var(--border);border-radius:10px;overflow:hidden;padding:0;background:var(--surface-sunken);cursor:zoom-in;aspect-ratio:4/3}
+.rm-att-grid img{width:100%;height:100%;object-fit:cover;display:block}
+.rm-att-doc{display:flex;align-items:center;gap:10px;border:1px solid var(--border);border-radius:10px;padding:8px 12px;color:var(--ink);font:500 14px/20px var(--font-sans);text-decoration:none}
+.rm-att-doc span{font:700 11px/1 var(--font-sans);background:var(--danger-bg);color:var(--danger);padding:6px 6px;border-radius:6px}
+.rm-att-doc:hover{border-color:var(--border-strong);text-decoration:none}
+.rm-claude-note .rm-md p{white-space:normal}
