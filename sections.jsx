@@ -21,9 +21,9 @@ function PhotoPhone({ src, app, h = 440 }) {
 }
 function Day() {
   const steps = [
-    ['06:30', 'Cho ăn', 'Đổ cám như mọi sáng. Bấm "Cho ăn", chọn ao, nhập số kg.', 'App ghi giờ, ghi ao thay bạn. Cuối vụ, tổng cám từng ao tự cộng xong.', 'feeding.jpg', 'app-log.jpg', 'ok', 'Đã ghi · Ao A06 · 18 kg'],
-    ['08:15', 'Đo nước', 'Đo pH, đo oxy như thường lệ. Nhập hai con số.', 'Oxy tụt, app báo ngay ở trang chủ và nói rõ việc cần làm — bật quạt, giảm cám.', 'water-test.jpg', 'app-home.png', 'stop', 'Ao A06 · Oxy 3,2 mg/L · thấp'],
-    ['10:40', 'Dùng thuốc', 'Chọn tên thuốc, ghi liều, ghi ao.', 'App tự tính ngày được bán và nhắc bạn trước. Không lo bán sớm, không lo nhà máy trả cá.', 'farmer-phone.jpg', null, 'warn', 'Ao B02 · còn 6 ngày mới được bán'],
+    ['06:30', 'Cho ăn', 'Đổ cám như mọi sáng. Bấm "Cho ăn", chọn ao, nhập số kg.', 'App ghi giờ, ghi ao thay bạn. Cuối vụ, tổng cám từng ao tự cộng xong.', 'feeding.jpg', 'app-log.jpg', 'ok', 'Đã ghi · Ao A06 · 18 kg'],
+    ['08:15', 'Đo nước', 'Đo pH, đo oxy như thường lệ. Nhập hai con số.', 'Oxy tụt, app báo ngay ở trang chủ và nói rõ việc cần làm — bật quạt, giảm cám.', 'water-test.jpg', 'app-home.png', 'stop', 'Ao A06 · Oxy 3,2 mg/L · thấp'],
+    ['10:40', 'Dùng thuốc', 'Chọn tên thuốc, ghi liều, ghi ao.', 'App tự tính ngày được bán và nhắc bạn trước. Không lo bán sớm, không lo nhà máy trả cá.', 'farmer-phone.jpg', null, 'warn', 'Ao B02 · còn 6 ngày mới được bán'],
   ];
   return <section id="day"><div className="wrap sec">
     <Eyebrow>Một ngày ở ao</Eyebrow>
