@@ -22,13 +22,13 @@ function PhotoPhone({ src, app, h = 440 }) {
 function Day() {
   const steps = [
     ['06:30', 'Cho ăn', 'Đổ cám như mọi sáng. Bấm "Cho ăn", chọn ao, nhập số kg.', 'App ghi giờ, ghi ao thay bạn. Cuối vụ, tổng cám từng ao tự cộng xong.', 'feeding.jpg', 'app-log.jpg', 'ok', 'Đã ghi · Ao A06 · 18 kg'],
-    ['08:15', 'Đo nước', 'Đo pH, đo oxy như thường lệ. Nhập hai con số.', 'Oxy tụt, app báo ngay ở trang chủ và nói rõ việc cần làm — bật quạt, giảm cám.', 'water-test.jpg', 'app-home.png', 'stop', 'Ao A06 · Oxy 3,2 mg/L · thấp'],
+    ['08:15', 'Đo nước', 'Đo pH, đo oxy như thường lệ. Nhập hai con số.', 'Oxy tụt, app báo ngay ở trang chủ và nói rõ việc cần làm: bật quạt, giảm cám.', 'water-test.jpg', 'app-home.png', 'stop', 'Ao A06 · Oxy 3,2 mg/L · thấp'],
     ['10:40', 'Dùng thuốc', 'Chọn tên thuốc, ghi liều, ghi ao.', 'App tự tính ngày được bán và nhắc bạn trước. Không lo bán sớm, không lo nhà máy trả cá.', 'farmer-phone.jpg', null, 'warn', 'Ao B02 · còn 6 ngày mới được bán'],
   ];
   return <section id="day"><div className="wrap sec">
     <Eyebrow>Một ngày ở ao</Eyebrow>
     <h2 className="t-display-l one-line" style={{ margin: '0 0 var(--space-2)' }}>Việc vẫn làm như cũ. Chỉ thêm một chạm.</h2>
-    <p className="t-body-lg" style={{ margin: '0 0 var(--space-7)', color: 'var(--ink-muted)', maxWidth: 560 }}>Ba việc quen tay mỗi sáng — app ghi lại, bạn không phải nhớ.</p>
+    <p className="t-body-lg" style={{ margin: '0 0 var(--space-7)', color: 'var(--ink-muted)', maxWidth: 560 }}>Ba việc quen tay mỗi sáng. App ghi lại, bạn không phải nhớ.</p>
     <div className="steps" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-8)' }}>
       {steps.map(([t, h, d1, d2, pic, app, st, badge], i) => <div key={t} className={'step' + (i % 2 ? ' rev' : '') + (i === 0 ? ' first' : '') + (i === steps.length - 1 ? ' last' : '')}>
         <div className="step-text">
@@ -50,7 +50,7 @@ function Sell() {
       <div>
         <Eyebrow>Ngày bán cá</Eyebrow>
         <h2 className="t-display-l" style={{ margin: '0 0 var(--space-4)' }}>Nhập số cân. Hồ sơ cả vụ đã sẵn.</h2>
-        <p className="t-body-lg" style={{ margin: '0 0 var(--space-3)' }}>Mọi lần cho ăn, đo nước, dùng thuốc đã nằm trong app từ đầu vụ. Bấm "Khai báo thu hoạch", nhập số cân — hồ sơ lô gửi thẳng cho nhà máy.</p>
+        <p className="t-body-lg" style={{ margin: '0 0 var(--space-3)' }}>Mọi lần cho ăn, đo nước, dùng thuốc đã nằm trong app từ đầu vụ. Bấm "Khai báo thu hoạch", nhập số cân là hồ sơ lô gửi thẳng cho nhà máy.</p>
         <p className="t-body-lg" style={{ margin: '0 0 var(--space-5)', color: 'var(--ink-muted)' }}>Nhà máy nhận cá kèm giấy tờ đủ: không hỏi lại, không trả về, không trừ giá.</p>
         <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap' }}><StatusBadge status="ok">Đủ ngày ngưng thuốc</StatusBadge><StatusBadge>Hồ sơ đã gửi nhà máy</StatusBadge></div>
       </div>
@@ -59,7 +59,7 @@ function Sell() {
   </div></section>;
 }
 function Why() {
-  const items = [['Không mất sổ', 'Sổ tay ướt, rách, thất lạc là mất cả vụ. App giữ dữ liệu trên máy và trên mạng — đổi điện thoại vẫn còn nguyên.'], ['Không bị trả cá', 'Nhà máy chỉ nhận cá đã ngưng thuốc đủ ngày. App nhắc trước nhiều ngày, nên đến lúc bán không ai phải quay xe.'], ['Bán được giá hơn', 'Cá có hồ sơ mới vào được lô xuất khẩu. Lô xuất khẩu, nhà máy trả giá cao hơn lô bán chợ.']];
+  const items = [['Không mất sổ', 'Sổ tay ướt, rách, thất lạc là mất cả vụ. App giữ dữ liệu trên máy và trên mạng, đổi điện thoại vẫn còn nguyên.'], ['Không bị trả cá', 'Nhà máy chỉ nhận cá đã ngưng thuốc đủ ngày. App nhắc trước nhiều ngày, nên đến lúc bán không ai phải quay xe.'], ['Bán được giá hơn', 'Cá có hồ sơ mới vào được lô xuất khẩu. Lô xuất khẩu, nhà máy trả giá cao hơn lô bán chợ.']];
   return <section id="why"><div className="wrap sec">
     <Eyebrow>Bạn được gì</Eyebrow><h2 className="t-display-l" style={{ margin: '0 0 var(--space-6)' }}>Ba điều hộ nuôi thấy ngay trong vụ đầu</h2>
     <div className="g3" style={{ gap: 'var(--space-4)' }}>{items.map(([t, d], i) => <div key={t} style={{ ...card, background: i === 2 ? 'var(--brand-50)' : 'var(--surface)', borderColor: i === 2 ? 'transparent' : 'var(--border)' }}><h3 className="t-display-m" style={{ margin: '0 0 var(--space-2)' }}>{t}</h3><p className="t-body" style={{ margin: 0, color: 'var(--ink-muted)' }}>{d}</p></div>)}</div>
@@ -96,7 +96,7 @@ function Download({ sent, onSend }) {
     <p className="t-body-lg" style={{ margin: '0 0 var(--space-6)', color: 'var(--ink-muted)', maxWidth: 560 }}>Tự cài trong một phút, hoặc để Aquanix đến tận ao cài giúp.</p>
     <div className="g2" style={{ gap: 'var(--space-5)', alignItems: 'start' }}>
       <div style={{ ...card, background: 'var(--brand-50)', borderColor: 'transparent', display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
-        <div><h3 className="t-display-m" style={{ margin: '0 0 var(--space-1)' }}>Tự cài app</h3><p className="t-body" style={{ margin: 0, color: 'var(--ink-muted)' }}>Mở máy ảnh điện thoại, đưa vào mã — app tự mở.</p></div>
+        <div><h3 className="t-display-m" style={{ margin: '0 0 var(--space-1)' }}>Tự cài app</h3><p className="t-body" style={{ margin: 0, color: 'var(--ink-muted)' }}>Mở máy ảnh điện thoại, đưa vào mã là app tự mở.</p></div>
         <div className="dl-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 'var(--space-5)', alignItems: 'center', flex: 1 }}>
           <Phone src="app-home.png" className="dl-phone" style={{ width: '100%', maxWidth: 190, justifySelf: 'center' }} />
           <div className="dl-qrs" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
@@ -119,7 +119,7 @@ function Download({ sent, onSend }) {
 }
 function Footer() {
   return <footer style={{ borderTop: '1px solid var(--border)' }}><div className="wrap" style={{ padding: 'var(--space-6) var(--space-5)', display: 'flex', alignItems: 'center', gap: 'var(--space-5)', flexWrap: 'wrap' }}>
-    <img src="../../assets/logo/aquanix-wordmark.png" alt="Aquanix — Nhật ký thuỷ sản điện tử" style={{ height: 40 }} />
+    <img src="../../assets/logo/aquanix-wordmark.png" alt="Aquanix: Nhật ký thuỷ sản điện tử" style={{ height: 40 }} />
     <span className="t-caption" style={{ color: 'var(--ink-muted)', marginLeft: 'auto' }}>Công Ty TNHH Công Nghệ Aquanix</span>
   </div></footer>;
 }
